@@ -57,10 +57,20 @@ module.exports = class bybit extends Exchange {
                 '1y': 'Y',
             },
             'urls': {
-                'test': 'https://api-testnet.bybit.com',
-                'logo': 'https://user-images.githubusercontent.com/51840849/76547799-daff5b80-649e-11ea-87fb-3be9bac08954.jpg',
-                'api': 'https://api.bybit.com',
-                'www': 'https://www.bybit.com/',
+                'test': {
+                    'v2': 'http://api-testnet.bybit.com/v2',
+                    'wapi': 'https://api-testnet.bybit.com',
+                    'public': 'https://api-testnet.bybit.com/open-api',
+                    'private': 'https://api-testnet.bybit.com/open-api',
+                },
+                'api': {
+                    'v2': 'https://api.bybit.com/v2',
+                    'wapi': 'https://api.bybit.com',
+                    'public': 'https://api.bybit.com/open-api',
+                    'private': 'https://api.bybit.com/open-api',
+                },
+                'logo': 'https://api2.bybit.com/bybit.png',
+                'www': 'https://www.bybit.com',
                 'doc': [
                     'https://bybit-exchange.github.io/docs/inverse/',
                     'https://bybit-exchange.github.io/docs/linear/',
