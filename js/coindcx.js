@@ -271,12 +271,13 @@ module.exports = class coindcx extends Exchange {
         if (market !== undefined) {
             symbol = market['symbol'];
         }
-        let takerOrMaker = undefined;
+        let side = undefined;
         if ('m' in trade) {
-            takerOrMaker = trade['m'] ? 'maker' : 'taker';
+            side = trade['m'] ? 'sell' : 'buy';
         }
         const price = this.safeFloat2 (trade, 'p', 'price');
         const amount = this.safeFloat2 (trade, 'q', 'quantity');
+
         return {
             'id': this.safeString (trade, 'id'),
             'info': trade,
@@ -285,8 +286,7 @@ module.exports = class coindcx extends Exchange {
             'symbol': symbol,
             'order': undefined,
             'type': undefined,
-            'takerOrMaker': takerOrMaker,
-            'side': this.safeString (trade, 'side'),
+            'side': side,
             'price': price,
             'amount': amount,
             'cost': price * amount,
