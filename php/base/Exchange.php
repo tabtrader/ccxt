@@ -1236,11 +1236,9 @@ class Exchange {
     public function print() {
         $args = func_get_args();
         if (is_array($args)) {
-            $array = array();
             foreach ($args as $arg) {
-                $array[] = is_string($arg) ? $arg : json_encode($arg, JSON_PRETTY_PRINT);
+                print_r($arg);
             }
-            echo implode(' ', $array), "\n";
         }
     }
 
@@ -1329,8 +1327,7 @@ class Exchange {
         }
 
         if ($this->verbose) {
-            $function = array($this, 'print');
-            $function('Request:', $method, $url, $verbose_headers, $body);
+            $this->print("\nRequest:\n", array($method, $url, $verbose_headers, $body));
         }
 
         // we probably only need to set it once on startup
@@ -1412,8 +1409,7 @@ class Exchange {
         $http_status_code = curl_getinfo($this->curl, CURLINFO_HTTP_CODE);
 
         if ($this->verbose) {
-            $function = array($this, 'print');
-            $function('Response:', $method, $url, $http_status_code, $curl_error, $response_headers, $result);
+            $this->print("\nResponse:\n", array($method, $url, $http_status_code, $curl_error, $response_headers, $result));
         }
 
         $this->handle_errors($http_status_code, $http_status_text, $url, $method, $response_headers, $result ? $result : null, $json_response, $headers, $body);
