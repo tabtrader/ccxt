@@ -273,6 +273,7 @@ module.exports = class poloniex extends Exchange {
                 'active': active,
                 'limits': limits,
                 'info': market,
+                'precision': undefined,
             });
         }
         return result;

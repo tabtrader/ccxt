@@ -171,8 +171,8 @@ module.exports = class coinmarketcap extends Exchange {
                     'quoteId': quoteId,
                     'info': market,
                     'active': undefined,
-                    'precision': this.precision,
-                    'limits': this.limits,
+                    'precision': undefined,
+                    'limits': undefined,
                 });
             }
         }

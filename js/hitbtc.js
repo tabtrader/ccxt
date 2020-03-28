@@ -1262,8 +1262,8 @@ module.exports = class hitbtc extends Exchange {
             'filled': filled,
             'remaining': remaining,
             'fee': fee,
-            'trades': trades,
-            'info': order,
+            'average': undefined,
+            'trades': undefined,
         };
     }
 

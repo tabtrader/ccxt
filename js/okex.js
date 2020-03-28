@@ -1847,7 +1847,28 @@ module.exports = class okex extends Exchange {
         //         "result":true
         //     }
         //
-        return this.parseOrder (response, market);
+        const timestamp = this.milliseconds ();
+        const id = this.safeString (response, 'order_id');
+        return {
+            'info': response,
+            'id': id,
+            'timestamp': timestamp,
+            'datetime': this.iso8601 (timestamp),
+            'lastTradeTimestamp': undefined,
+            'status': undefined,
+            'symbol': symbol,
+            'type': type,
+            'side': side,
+            'price': price,
+            'amount': amount,
+            'filled': undefined,
+            'remaining': undefined,
+            'cost': undefined,
+            'trades': undefined,
+            'fee': undefined,
+            'clientOrderId': undefined,
+            'average': undefined,
+        };
     }
 
     async cancelOrder (id, symbol = undefined, params = {}) {

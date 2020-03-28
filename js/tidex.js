@@ -528,7 +528,7 @@ module.exports = class tidex extends Exchange {
             'filled': filled,
             'fee': undefined,
             // 'trades': this.parseTrades (order['trades'], market),
-            'info': response,
+            'info': undefined,
             'clientOrderId': undefined,
             'average': undefined,
             'trades': undefined,

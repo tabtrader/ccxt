@@ -130,8 +130,8 @@ module.exports = class xbtce extends Exchange {
                 'quoteId': quoteId,
                 'info': market,
                 'active': undefined,
-                'precision': this.precision,
-                'limits': this.limits,
+                'precision': undefined,
+                'limits': undefined,
             });
         }
         return result;

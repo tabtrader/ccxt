@@ -1038,6 +1038,11 @@ module.exports = class kraken extends Exchange {
             'quote': quote,
             'baseId': baseId,
             'quoteId': quoteId,
+            'id': undefined,
+            'active': undefined,
+            'precision': undefined,
+            'limits': undefined,
+            'info': undefined,
         };
         this.options['delistedMarketsById'][id] = market;
         return market;
@@ -1123,7 +1128,8 @@ module.exports = class kraken extends Exchange {
             'average': average,
             'remaining': remaining,
             'fee': fee,
-            'trades': trades,
+            // 'trades': this.parseTrades (order['trades'], market),
+            'trades': undefined,
         };
     }
 
