@@ -156,7 +156,7 @@ function searchFor (filename) {
                 sectionLines.length = sectionLines.length - 1
                 const indent = sectionLines[sectionLines.length - 1].match (/^\s+/)[0].length
                 for (const missingKey of toAdd) {
-                    sectionLines.push (' '.repeat (indent) + '\'' + missingKey + '\': undefined,')
+                    sectionLines.push (' '.repeat (indent) + '\'' + missingKey + '\': ' + (missingKey === 'precision' || missingKey === 'limits' ? ('this.' + missingKey) : 'undefined') + ',')
                 }
                 sectionLines.push (end)
                 toInject.push ({top, bottom, sectionLines})
