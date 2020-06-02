@@ -42,7 +42,6 @@ module.exports = class bitbns extends Exchange {
             'urls': {
                 'logo': 'https://bitbns.com/assets/img/logos/bitbns.svg',
                 'api': {
-                    // 'public': 'https://c086dmj6f2.execute-api.ap-south-1.amazonaws.com/dev/',
                     'public': 'https://bitbns.com/order/',
                     'private': 'https://api.bitbns.com/api/trade/v2',
                     'private1': 'https://api.bitbns.com/api/trade/v1',
@@ -52,7 +51,6 @@ module.exports = class bitbns extends Exchange {
                 'fees': 'https://bitbns.com/fees/',
             },
             'api': {
-                // All methods are passed in as query params
                 'public': { 'get': [
                     'fetchOrderBook',
                     'fetchMarkets',
@@ -79,7 +77,7 @@ module.exports = class bitbns extends Exchange {
                     'taker': 0.0025,
                 },
             },
-            'verbose': false,
+            'verbose': true,
             // 'proxy': '',
             'apiKey': '',
             'secret': '',
@@ -87,67 +85,33 @@ module.exports = class bitbns extends Exchange {
     }
 
     sign (path, api = 'public', method = 'GET', params = {}, headers = undefined, body = undefined) {
-        // console.log("PAth:", path);
-        // console.log ('Params: ', params);
         let url = '';
-        if (api === 'private1') {
-            // Generate complete url
-            url = this.urls['api'][api] + '/' + path + '/' + this.safeString (params, 'symbol');
-            // console.log (method, url);
-            // console.log ('Signing Privately !!!');
+        if (api === 'private1' || api === 'private') {
+            if (api === 'private1') {
+                // Generate complete url
+                url = this.urls['api'][api] + '/' + path + '/' + this.safeString (params, 'symbol');
+            }
+            if (api === 'private') {
+                url = this.urls['api'][api] + '/' + this.implodeParams (path, params);
+            }
             if (method === 'POST') {
                 body = this.json (params);
             }
             // Generate payload
             const timeStamp_nonce = this.milliseconds ();
-            // const timeStamp_nonce = '1571663667098';
             const data = {
                 'symbol': '/' + path + '/' + this.safeString (params, 'symbol'),
                 'timeStamp_nonce': timeStamp_nonce,
                 'body': body,
             };
-            // console.log("ccxt data:", data);
-            const payload = this.stringToBase64 (this.json (data));
-            // console.log("ccxt payload:", payload);
+            const payload = this.stringToBase64 (this.encode (this.json (data)));
             // Generate signature from payload
-            const signature = this.hmac (payload, this.secret, 'sha512', 'hex');
-            // console.log("ccxt sign:", signature);
+            const signature = this.hmac (payload, this.encode (this.secret), 'sha512', 'hex');
             // Init headers
             headers = {};
             // Attach headers
             headers['X-BITBNS-APIKEY'] = this.apiKey;
-            headers['X-BITBNS-PAYLOAD'] = payload;
-            headers['X-BITBNS-SIGNATURE'] = signature;
-            headers['Accept'] = 'application/json';
-            headers['Accept-Charset'] = 'utf-8';
-            headers['content-type'] = 'application/x-www-form-urlencoded';
-        } else if (api === 'private') {
-            // Generate complete url
-            url = this.urls['api'][api] + '/' + this.implodeParams (path, params);
-            // console.log (method, url);
-            // console.log ('Signing Privately !!!');
-            if (method === 'POST') {
-                body = this.json (params);
-            }
-            // Generate payload
-            const timeStamp_nonce = this.milliseconds ();
-            // const timeStamp_nonce = '1571663667098';
-            const data = {
-                'symbol': '/' + path + '/' + this.safeString (params, 'symbol'),
-                'timeStamp_nonce': timeStamp_nonce,
-                'body': body,
-            };
-            // console.log("ccxt data:", data);
-            const payload = this.stringToBase64 (this.json (data));
-            // console.log("ccxt payload:", payload);
-            // Generate signature from payload
-            const signature = this.hmac (payload, this.secret, 'sha512', 'hex');
-            // console.log("ccxt sign:", signature);
-            // Init headers
-            headers = {};
-            // Attach headers
-            headers['X-BITBNS-APIKEY'] = this.apiKey;
-            headers['X-BITBNS-PAYLOAD'] = payload;
+            headers['X-BITBNS-PAYLOAD'] = this.decode (payload);
             headers['X-BITBNS-SIGNATURE'] = signature;
             headers['Accept'] = 'application/json';
             headers['Accept-Charset'] = 'utf-8';
@@ -157,18 +121,13 @@ module.exports = class bitbns extends Exchange {
             if (Object.keys (params).length) {
                 url += '?' + this.urlencode (params);
             }
-            // console.log (method, url);
         }
-        // console.log(url);
-        // if (api === 'private')
-        // console.log ("ccxt obj:",{ 'url': url, 'method': method, 'body': body, 'headers': headers });
         return { 'url': url, 'method': method, 'body': body, 'headers': headers };
     }
 
     async fetchMarkets (params = {}) {
-        const data = await this.publicGetFetchMarkets ();
-        // console.log(data);
-        for (let i = 0; i < data.length; i += 1) {
+        const data = await this.publicGetFetchMarkets (params);
+        for (let i = 0; i < data.length; i++) {
             if (data[i]['quote'] === 'USDT') {
                 data[i]['us_symbol'] = data[i]['base'] + '_' + data[i]['quote'];
             }
@@ -177,17 +136,23 @@ module.exports = class bitbns extends Exchange {
     }
 
     async fetchTickers (symbols = undefined, params = {}) {
-        const tickers = await this.publicGetFetchTickers ();
-        return tickers;
+        const data = await this.publicGetFetchTickers (params);
+        if (symbols === undefined) {
+            return data;
+        }
+        const result = {};
+        for (let i = 0; i < symbols.length; i++) {
+            result[symbols[i]] = this.safeValue (data, symbols[i]);
+        }
+        return result;
     }
 
     async fetchTicker (symbol = undefined, params = {}) {
-        const tickers = await this.fetchTickers ();
+        const tickers = await this.fetchTickers (undefined, params);
         return this.safeValue (tickers, symbol);
     }
 
     async fetchTrades (symbol, since = undefined, limit = undefined, params = {}) {
-        // const data = bitbns
         await this.loadMarkets ();
         const market = this.market (symbol);
         const excgSymbol = market['id'];
@@ -197,12 +162,11 @@ module.exports = class bitbns extends Exchange {
             'limit': limit,
         };
         const trades = await this.publicGetFetchTrades (this.extend (request, params));
-        // console.log (trades.length);
         for (let i = 0; i < trades.length; i++) {
             trades[i]['symbol'] = symbol;
             trades[i]['id'] = this.safeString (trades[i], 'id');
             const keys = Object.keys (trades[i]);
-            for (let k = 0; k < keys.length; k += 1) {
+            for (let k = 0; k < keys.length; k++) {
                 if (!this.safeString (trades[i], keys[k])) {
                     trades[i][keys[k]] = undefined;
                 }
@@ -219,8 +183,7 @@ module.exports = class bitbns extends Exchange {
             'symbol': excgSymbol,
             'limit': limit,
         };
-        const ob = await this.publicGetFetchOrderBook (this.extend (request, params));
-        return ob;
+        return await this.publicGetFetchOrderBook (this.extend (request, params));
     }
 
     async createOrder (symbol, type, side, amount, price = undefined, params = {}) {
@@ -259,8 +222,37 @@ module.exports = class bitbns extends Exchange {
         } else {
             request['side'] = 'cancelOrder';
         }
-        const resp = await this.privatePostCancel (this.extend (request, params));
-        return resp;
+        return await this.privatePostCancel (this.extend (request, params));
+    }
+
+    parseOrder (order, market = undefined) {
+        const orderData = this.safeValue (order, 'data')[0];
+        const orderObj = {
+            'id': this.safeString (orderData, 'entry_id'), // string
+            'datetime': this.safeString (orderData, 'time'), // ISO8601 datetime of 'timestamp' with milliseconds
+            'timestamp': this.parse8601 (this.safeString (orderData, 'time')),
+            'lastTradeTimestamp': undefined, // Unix timestamp of the most recent trade on this order
+            'symbol': this.safeString (market, 'symbol'),      // symbol
+            'type': 'limit',        // 'market', 'limit'
+            'side': this.safeString (orderData, 'side'),          // 'buy', 'sell'
+            'price': this.safeFloat (orderData, 'rate'),    // float price in quote currency
+            'amount': this.safeFloat (orderData, 'amount'),           // ordered amount of base currency
+            'filled': this.safeFloat (orderData, 'filled'),           // filled amount of base currency
+            'remaining': this.safeFloat (orderData, 'remaining'), // remaining amount to fill
+            'cost': this.safeFloat (orderData, 'filled') * this.safeFloat (orderData, 'avg_cost'),   // 'filled' * 'price' (filling price used where available)
+            'trades': undefined,         // a list of order trades/executions
+            'fee': this.safeFloat (orderData, 'fee'),
+            'info': order,              // the original unparsed order structure as is
+        };
+        const status = this.safeInteger (orderData, 'status');
+        if (status === 0) {
+            orderObj['status'] = 'open';
+        } else if (status === -1) {
+            orderObj['status'] = 'canceled';
+        } else if (status === 2) {
+            orderObj['status'] = 'closed';
+        }
+        return orderObj;
     }
 
     async fetchOrder (id, symbol = undefined, params = {}) {
@@ -272,35 +264,7 @@ module.exports = class bitbns extends Exchange {
             'entry_id': id,
         };
         const resp = await this.private1PostOrderStatus (this.extend (request, params));
-        const order = this.safeValue (resp, 'data')[0];
-        // console.log(order);
-        const orderObj = {
-            'id': this.safeString (order, 'entry_id'), // string
-            'datetime': this.safeString (order, 'time'), // ISO8601 datetime of 'timestamp' with milliseconds
-            'timestamp': this.parse8601 (this.safeString (order, 'time')),
-            'lastTradeTimestamp': undefined, // Unix timestamp of the most recent trade on this order
-            'symbol': symbol,      // symbol
-            'type': 'limit',        // 'market', 'limit'
-            'side': undefined,          // 'buy', 'sell'
-            'price': this.safeString (order, 'rate'),    // float price in quote currency
-            'amount': undefined,           // ordered amount of base currency
-            'filled': undefined,           // filled amount of base currency
-            'remaining': this.safeString (order, 'btc'), // remaining amount to fill
-            'cost': undefined,   // 'filled' * 'price' (filling price used where available)
-            'trades': undefined,         // a list of order trades/executions
-            'fee': undefined,
-            'info': resp,              // the original unparsed order structure as is
-        };
-        const status = this.safeInteger (order, 'status');
-        // console.log(status);
-        if (status === 0) {
-            orderObj['status'] = 'open';
-        } else if (status === -1) {
-            orderObj['status'] = 'canceled';
-        } else if (status === 2) {
-            orderObj['status'] = 'closed';
-        }
-        return orderObj;
+        return this.parseOrder (resp, market);
     }
 
     async fetchOpenOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -319,12 +283,10 @@ module.exports = class bitbns extends Exchange {
         } else {
             request['side'] = 'listOpenOrders';
         }
-        // const resp = await this.private1PostListOpenOrders (this.extend (request, params));
         const resp = await this.privatePostGetordersnew (this.extend (request, params));
-        // return resp;
         const orders = this.safeValue (resp, 'data');
         const openOrders = [];
-        for (let i = 0; i < orders.length; i += 1) {
+        for (let i = 0; i < orders.length; i++) {
             const orderObj = {
                 'id': this.safeString (orders[i], 'entry_id'), // string
                 'datetime': this.safeString (orders[i], 'time'), // ISO8601 datetime of 'timestamp' with milliseconds
@@ -343,7 +305,6 @@ module.exports = class bitbns extends Exchange {
                 'info': resp,              // the original unparsed order structure as is
             };
             const status = this.safeInteger (orders[i], 'status');
-            // console.log(status);
             if (status === 0) {
                 orderObj['status'] = 'open';
             } else if (status === -1) {
@@ -360,110 +321,83 @@ module.exports = class bitbns extends Exchange {
 
     async fetchBalance (params = {}) {
         await this.loadMarkets ();
-        // console.log('exchange.currencies :', exchange.currencies);
-        const symbols = Object.keys (this.currencies);
-        // same as previous line
-        // console.log('symbols :', symbols);
-        await this.loadMarkets ();
+        const codes = Object.keys (this.omit (this.currencies, ['INR']));
+        // Body for the balance API request
         const request = {
             'symbol': 'EVERYTHING',
         };
+        // Make the API call for balance
         const data = await this.private1PostCurrentCoinBalance (this.extend (request, params));
-        // console.log('Data ::', data);
         const balances = {};
-        // balances['info'] = data;
-        // console.log('balances :', balances);
-        const currencybalances = data['data'];
-        // console.log('currencybalances :', currencybalances);
-        const freefiat = currencybalances['availableorderMoney'] ? currencybalances['availableorderMoney'] : 0;
-        const usedfiat = currencybalances['inorderMoney'] ? currencybalances['inorderMoney'] : 0;
-        // console.log('freefiat :', { INR: freefiat });
-        // console.log('usedfiat :', { INR: usedfiat },{INR: freefiat + usedfiat});
-        balances['free'] = { 'INR': freefiat };
-        balances['used'] = { 'INR': usedfiat };
-        balances['total'] = { 'INR': freefiat + usedfiat };
-        // console.log('balances :', balances);
-        for (let i = 0; i < this.symbols.length; i += 1) {
-            const symbol = symbols[i];
-            const currency = symbol;
-            const availableOrderString = 'availableorder' + symbol;
-            const free = currencybalances[availableOrderString] ? currencybalances[availableOrderString] : 0;
-            const inorderString = 'inorder' + symbol;
-            const used = currencybalances[inorderString] ? currencybalances[inorderString] : 0;
-            const total = free + used;
-            balances[currency] = {
-                'free': free,
-                'used': used,
-                'total': total,
+        balances['info'] = data;
+        const currencybalances = this.safeValue (data, 'data');
+        const freefiat = this.safeFloat (currencybalances, 'availableorderMoney');
+        const usedfiat = this.safeFloat (currencybalances, 'inorderMoney');
+        if ((freefiat !== undefined) || (usedfiat !== undefined)) {
+            balances['INR'] = {
+                'free': freefiat,
+                'used': usedfiat,
             };
         }
-        // console.log ('balances :', balances);
-        return balances;
+        for (let i = 0; i < codes.length; i++) {
+            const code = codes[i];
+            const currency = this.currency (code);
+            const currencyId = currency['id'];
+            const availableOrderString = 'availableorder' + currencyId;
+            const free = this.safeFloat (currencybalances, availableOrderString);
+            const inorderString = 'inorder' + currencyId;
+            const used = this.safeFloat (currencybalances, inorderString);
+            if ((free !== undefined) || (used !== undefined)) {
+                balances[code] = {
+                    'free': free,
+                    'used': used,
+                };
+            }
+        }
+        return this.parseBalance (balances);
     }
 
     async fetchMyTrades (symbol = undefined, since = undefined, limit = undefined, params = {}) {
-        // console.log("fetchMyTrades", symbol, since, limit);
         await this.loadMarkets ();
         const market = this.market (symbol);
         const tradingSymbol = market['id'];
-        limit = limit === undefined ? 0 : limit;
-        // for (;allTrades.length < limit;) {
-        //     const request = {
-        //         'symbol': tradingSymbol,
-        //         'page': page,
-        //         'since': since,
-        //     };
-        //     // console.log(request);
-        //     const resp = await this.private1PostListExecutedOrders (this.extend (request, params));
-        //     // console.log("resp: ",resp.data);
-        //     if (resp.data.length === 0) {
-        //         // console.log ("All trades fetched");
-        //         break;
-        //     }
-        //     page = page + 1;
-        //     allTrades = allTrades.concat (resp.data);
-        //     // console.log("int alltrades:", allTra÷des);
-        // }
+        if (limit === undefined) {
+            limit = 0;
+        }
         if (since !== undefined) {
             since = this.iso8601 (since);
         }
         const request = {
             'symbol': tradingSymbol,
             'page': 0,
-            // 'since': since,
         };
         if (since !== undefined) {
             request['since'] = since;
         }
-        // if(since === )
-        // console.log(request);
         const resp = await this.private1PostListExecutedOrders (this.extend (request, params));
-        const trades = resp.data;
+        const trades = this.safeValue (resp, 'data');
         const result = [];
         let numOfTrades = trades.length;
-        // console.log("numoftrades", numOfTrades);
         if (limit && trades.length > limit) {
             numOfTrades = limit;
         }
-        // console.log("numoftrades", numOfTrades);
-        for (let i = 0; i < numOfTrades; i += 1) {
+        for (let i = 0; i < numOfTrades; i++) {
             const tradeObj = {
                 'info': trades[i],
-                'id': undefined,
-                'timestamp': trades[i].date,
-                'datetime': this.parse8601 (trades[i].date),
+                'id': trades[i]['id'],
+                'timestamp': trades[i]['date'],
+                'datetime': this.parse8601 (trades[i]['date']),
                 'symbol': symbol,
                 'order': undefined,
                 'type': 'limit',
                 'side': undefined,
                 'takerOrMaker': undefined,
-                'price': trades[i].rate,
-                'amount': trades[i].amount,
-                'fee': trades[i].fee,
+                'price': trades[i]['rate'],
+                'amount': trades[i]['amount'],
+                'fee': trades[i]['fee'],
             };
             result.push (tradeObj);
         }
-        // console.log (result);
         return result;
     }
 };
