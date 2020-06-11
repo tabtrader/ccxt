@@ -77,8 +77,6 @@ module.exports = class bitbns extends Exchange {
                     'taker': 0.0025,
                 },
             },
-            'verbose': true,
-            // 'proxy': '',
             'apiKey': '',
             'secret': '',
         });
