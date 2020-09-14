@@ -214,7 +214,7 @@ module.exports = class bitbns extends Exchange {
         };
         if (market['quote'] === 'USDT') {
             request['symbol'] = market['us_symbol'];
-        }                'fee': trades[i]['fee'],
+        }
 
         if (market['quote'] === 'USDT') {
             request['side'] = 'usdtcancelOrder';
