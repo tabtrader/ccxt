@@ -290,7 +290,7 @@ module.exports = class coindcx extends Exchange {
             'price': price,
             'amount': amount,
             'cost': price * amount,
-            'fee': this.safeFloat (trade, 'fee_amount'),
+            'fee': undefined
         };
     }
 
