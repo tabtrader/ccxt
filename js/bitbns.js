@@ -214,7 +214,8 @@ module.exports = class bitbns extends Exchange {
         };
         if (market['quote'] === 'USDT') {
             request['symbol'] = market['us_symbol'];
-        }
+        }                'fee': trades[i]['fee'],
+
         if (market['quote'] === 'USDT') {
             request['side'] = 'usdtcancelOrder';
         } else {
@@ -367,8 +368,7 @@ module.exports = class bitbns extends Exchange {
                 'side': undefined,
                 'takerOrMaker': undefined,
                 'price': trades[i]['rate'],
-                'amount': trades[i]['amount'],
-                'fee': trades[i]['fee'],
+                'amount': trades[i]['amount']
             };
             result.push (tradeObj);
         }
