@@ -183,7 +183,7 @@ module.exports = class coinone extends Exchange {
                 result[symbol]['timestamp'] = timestamp;
             }
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchTicker (symbol, params = {}) {
@@ -644,7 +644,7 @@ module.exports = class coinone extends Exchange {
                 'access_token': this.apiKey,
                 'nonce': nonce,
             }, params));
-            const payload = this.stringToBase64 (this.encode (json));
+            const payload = this.stringToBase64 (json);
             body = this.decode (payload);
             const secret = this.secret.toUpperCase ();
             const signature = this.hmac (payload, this.encode (secret), 'sha512');

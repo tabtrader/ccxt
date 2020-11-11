@@ -4,7 +4,7 @@
 
 # -----------------------------------------------------------------------------
 
-__version__ = '1.33.80'
+__version__ = '1.37.59'
 
 # -----------------------------------------------------------------------------
 
@@ -57,11 +57,11 @@ from ccxt.async_support.bequant import bequant                            # noqa
 from ccxt.async_support.bibox import bibox                                # noqa: F401
 from ccxt.async_support.bigone import bigone                              # noqa: F401
 from ccxt.async_support.binance import binance                            # noqa: F401
-from ccxt.async_support.binanceje import binanceje                        # noqa: F401
 from ccxt.async_support.binanceus import binanceus                        # noqa: F401
 from ccxt.async_support.bit2c import bit2c                                # noqa: F401
 from ccxt.async_support.bitbank import bitbank                            # noqa: F401
 from ccxt.async_support.bitbay import bitbay                              # noqa: F401
+from ccxt.async_support.bitcoincom import bitcoincom                      # noqa: F401
 from ccxt.async_support.bitfinex import bitfinex                          # noqa: F401
 from ccxt.async_support.bitfinex2 import bitfinex2                        # noqa: F401
 from ccxt.async_support.bitflyer import bitflyer                          # noqa: F401
@@ -145,6 +145,7 @@ from ccxt.async_support.luno import luno                                  # noqa
 from ccxt.async_support.lykke import lykke                                # noqa: F401
 from ccxt.async_support.mercado import mercado                            # noqa: F401
 from ccxt.async_support.mixcoins import mixcoins                          # noqa: F401
+from ccxt.async_support.novadax import novadax                            # noqa: F401
 from ccxt.async_support.oceanex import oceanex                            # noqa: F401
 from ccxt.async_support.okcoin import okcoin                              # noqa: F401
 from ccxt.async_support.okex import okex                                  # noqa: F401
@@ -154,6 +155,7 @@ from ccxt.async_support.poloniex import poloniex                          # noqa
 from ccxt.async_support.probit import probit                              # noqa: F401
 from ccxt.async_support.qtrade import qtrade                              # noqa: F401
 from ccxt.async_support.rightbtc import rightbtc                          # noqa: F401
+from ccxt.async_support.ripio import ripio                                # noqa: F401
 from ccxt.async_support.southxchange import southxchange                  # noqa: F401
 from ccxt.async_support.stex import stex                                  # noqa: F401
 from ccxt.async_support.stronghold import stronghold                      # noqa: F401
@@ -181,11 +183,11 @@ exchanges = [
     'bibox',
     'bigone',
     'binance',
-    'binanceje',
     'binanceus',
     'bit2c',
     'bitbank',
     'bitbay',
+    'bitcoincom',
     'bitfinex',
     'bitfinex2',
     'bitflyer',
@@ -269,6 +271,7 @@ exchanges = [
     'lykke',
     'mercado',
     'mixcoins',
+    'novadax',
     'oceanex',
     'okcoin',
     'okex',
@@ -278,6 +281,7 @@ exchanges = [
     'probit',
     'qtrade',
     'rightbtc',
+    'ripio',
     'southxchange',
     'stex',
     'stronghold',

@@ -88,6 +88,7 @@ class bitbank extends Exchange {
                 'ETH/BTC' => array( 'id' => 'eth_btc', 'symbol' => 'ETH/BTC', 'base' => 'ETH', 'quote' => 'BTC', 'baseId' => 'eth', 'quoteId' => 'btc' ),
                 'LTC/BTC' => array( 'id' => 'ltc_btc', 'symbol' => 'LTC/BTC', 'base' => 'LTC', 'quote' => 'BTC', 'baseId' => 'ltc', 'quoteId' => 'btc' ),
                 'XRP/JPY' => array( 'id' => 'xrp_jpy', 'symbol' => 'XRP/JPY', 'base' => 'XRP', 'quote' => 'JPY', 'baseId' => 'xrp', 'quoteId' => 'jpy' ),
+                'XLM/JPY' => array( 'id' => 'xlm_jpy', 'symbol' => 'XLM/JPY', 'base' => 'XLM', 'quote' => 'JPY', 'baseId' => 'xlm', 'quoteId' => 'jpy' ),
                 'BTC/JPY' => array( 'id' => 'btc_jpy', 'symbol' => 'BTC/JPY', 'base' => 'BTC', 'quote' => 'JPY', 'baseId' => 'btc', 'quoteId' => 'jpy' ),
                 'ETH/JPY' => array( 'id' => 'eth_jpy', 'symbol' => 'ETH/JPY', 'base' => 'ETH', 'quote' => 'JPY', 'baseId' => 'eth', 'quoteId' => 'jpy' ),
                 'LTC/JPY' => array( 'id' => 'ltc_jpy', 'symbol' => 'LTC/JPY', 'base' => 'LTC', 'quote' => 'JPY', 'baseId' => 'ltc', 'quoteId' => 'jpy' ),
@@ -200,7 +201,7 @@ class bitbank extends Exchange {
         $cost = null;
         if ($price !== null) {
             if ($amount !== null) {
-                $cost = floatval ($this->cost_to_precision($symbol, $price * $amount));
+                $cost = floatval($this->cost_to_precision($symbol, $price * $amount));
             }
         }
         $id = $this->safe_string_2($trade, 'transaction_id', 'trade_id');
@@ -433,7 +434,7 @@ class bitbank extends Exchange {
             $request['count'] = $limit;
         }
         if ($since !== null) {
-            $request['since'] = intval ($since / 1000);
+            $request['since'] = intval($since / 1000);
         }
         $response = $this->privateGetUserSpotActiveOrders (array_merge($request, $params));
         $data = $this->safe_value($response, 'data', array());
@@ -455,7 +456,7 @@ class bitbank extends Exchange {
             $request['count'] = $limit;
         }
         if ($since !== null) {
-            $request['since'] = intval ($since / 1000);
+            $request['since'] = intval($since / 1000);
         }
         $response = $this->privateGetUserSpotTradeHistory (array_merge($request, $params));
         $data = $this->safe_value($response, 'data', array());

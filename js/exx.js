@@ -3,7 +3,7 @@
 //  ---------------------------------------------------------------------------
 
 const Exchange = require ('./base/Exchange');
-const { ExchangeError, AuthenticationError, ExchangeNotAvailable } = require ('./base/errors');
+const { ExchangeError, AuthenticationError, ExchangeNotAvailable, ArgumentsRequired } = require ('./base/errors');
 
 //  ---------------------------------------------------------------------------
 
@@ -90,6 +90,7 @@ module.exports = class exx extends Exchange {
                 },
             },
             'commonCurrencies': {
+                'DOS': 'DEMOS',
                 'TV': 'TIV', // Ti-Value
             },
             'exceptions': {
@@ -201,7 +202,7 @@ module.exports = class exx extends Exchange {
             };
             result[symbol] = this.parseTicker (ticker, market);
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchOrderBook (symbol, limit = undefined, params = {}) {
@@ -383,6 +384,9 @@ module.exports = class exx extends Exchange {
 
     async fetchOpenOrders (symbol = undefined, since = undefined, limit = undefined, params = {}) {
         await this.loadMarkets ();
+        if (symbol === undefined) {
+            throw new ArgumentsRequired (this.id + ' fetchOpenOrders requires a symbol argument');
+        }
         const market = this.market (symbol);
         const request = {
             'currency': market['id'],

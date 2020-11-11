@@ -118,6 +118,8 @@ module.exports = class bibox extends Exchange {
                 '4003': DDoSProtection, // server busy please try again later
             },
             'commonCurrencies': {
+                'BOX': 'DefiBox',
+                'BPT': 'BlockPool Token',
                 'KEY': 'Bihu',
                 'MTC': 'MTC Mesh Network', // conflict with MTC Docademic doc.com Token https://github.com/ccxt/ccxt/issues/6081 https://github.com/ccxt/ccxt/issues/3025
                 'PAI': 'PCHAIN',
@@ -278,7 +280,8 @@ module.exports = class bibox extends Exchange {
         };
         const response = await this.publicGetMdata (this.extend (request, params));
         const tickers = this.parseTickers (response['result'], symbols);
-        return this.indexBy (tickers, 'symbol');
+        const result = this.indexBy (tickers, 'symbol');
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     parseTrade (trade, market = undefined) {
@@ -321,7 +324,7 @@ module.exports = class bibox extends Exchange {
         }
         if (feeCost !== undefined) {
             fee = {
-                'cost': feeCost,
+                'cost': -feeCost,
                 'currency': feeCurrency,
                 'rate': feeRate,
             };

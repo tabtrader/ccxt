@@ -488,7 +488,7 @@ class bitmax extends Exchange {
             'type' => $takerOrMaker,
             'currency' => $market[$key],
             'rate' => $rate,
-            'cost' => floatval ($cost),
+            'cost' => floatval($cost),
         );
     }
 
@@ -991,20 +991,7 @@ class bitmax extends Exchange {
         //
         $status = $this->parse_order_status($this->safe_string($order, 'status'));
         $marketId = $this->safe_string($order, 'symbol');
-        $symbol = null;
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-            } else {
-                list($baseId, $quoteId) = explode('/', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '/');
         $timestamp = $this->safe_integer_2($order, 'timestamp', 'sendingTime');
         $lastTradeTimestamp = $this->safe_integer($order, 'lastExecTime');
         $price = $this->safe_float($order, 'price');
@@ -1694,12 +1681,12 @@ class bitmax extends Exchange {
         } else {
             $this->check_required_credentials();
             $timestamp = (string) $this->milliseconds();
-            $auth = $timestamp . '+' . $request;
-            $signature = $this->hmac($this->encode($auth), $this->encode($this->secret), 'sha256', 'base64');
+            $payload = $timestamp . '+' . $request;
+            $hmac = $this->hmac($this->encode($payload), $this->encode($this->secret), 'sha256', 'base64');
             $headers = array(
-                'x-$auth-key' => $this->apiKey,
-                'x-$auth-timestamp' => $timestamp,
-                'x-$auth-signature' => $this->decode($signature),
+                'x-auth-key' => $this->apiKey,
+                'x-auth-timestamp' => $timestamp,
+                'x-auth-signature' => $hmac,
             );
             if ($method === 'GET') {
                 if ($query) {

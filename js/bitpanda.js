@@ -43,6 +43,7 @@ module.exports = class bitpanda extends Exchange {
                 'fetchTicker': true,
                 'fetchTickers': true,
                 'fetchWithdrawals': true,
+                'withdraw': true,
             },
             'timeframes': {
                 '1m': '1/MINUTES',
@@ -114,7 +115,7 @@ module.exports = class bitpanda extends Exchange {
             },
             'fees': {
                 'trading': {
-                    'tierBased': false,
+                    'tierBased': true,
                     'percentage': true,
                     'taker': 0.15 / 100,
                     'maker': 0.10 / 100,
@@ -146,12 +147,6 @@ module.exports = class bitpanda extends Exchange {
             'requiredCredentials': {
                 'apiKey': true,
                 'secret': false,
-            },
-            // exchange-specific options
-            'options': {
-                'fetchTradingFees': {
-                    'method': 'fetchPrivateTradingFees', // or 'fetchPublicTradingFees'
-                },
             },
             'exceptions': {
                 'exact': {
@@ -238,6 +233,13 @@ module.exports = class bitpanda extends Exchange {
             },
             'commonCurrencies': {
                 'MIOTA': 'IOTA', // https://github.com/ccxt/ccxt/issues/7487
+            },
+            // exchange-specific options
+            'options': {
+                'fetchTradingFees': {
+                    'method': 'fetchPrivateTradingFees', // or 'fetchPublicTradingFees'
+                },
+                'fiat': [ 'EUR', 'CHF' ],
             },
         });
     }
@@ -497,20 +499,7 @@ module.exports = class bitpanda extends Exchange {
         //
         const timestamp = this.parse8601 (this.safeString (ticker, 'time'));
         const marketId = this.safeString (ticker, 'instrument_code');
-        let symbol = undefined;
-        if (marketId !== undefined) {
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-            } else if (marketId !== undefined) {
-                const [ baseId, quoteId ] = marketId.split ('_');
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
-        }
-        if ((symbol === undefined) && (market !== undefined)) {
-            symbol = market['symbol'];
-        }
+        const symbol = this.safeSymbol (marketId, market, '_');
         const last = this.safeFloat (ticker, 'last_price');
         const percentage = this.safeFloat (ticker, 'price_change_percentage');
         const change = this.safeFloat (ticker, 'price_change');
@@ -577,7 +566,7 @@ module.exports = class bitpanda extends Exchange {
 
     async fetchTickers (symbols = undefined, params = {}) {
         await this.loadMarkets ();
-        const tickers = await this.publicGetMarketTicker (params);
+        const response = await this.publicGetMarketTicker (params);
         //
         //     [
         //         {
@@ -599,12 +588,12 @@ module.exports = class bitpanda extends Exchange {
         //     ]
         //
         const result = {};
-        for (let i = 0; i < tickers.length; i++) {
-            const ticker = this.parseTicker (tickers[i]);
+        for (let i = 0; i < response.length; i++) {
+            const ticker = this.parseTicker (response[i]);
             const symbol = ticker['symbol'];
             result[symbol] = ticker;
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchOrderBook (symbol, limit = undefined, params = {}) {
@@ -711,8 +700,7 @@ module.exports = class bitpanda extends Exchange {
         const durationInSeconds = this.parseTimeframe (timeframe);
         const duration = durationInSeconds * 1000;
         const timestamp = this.parse8601 (this.safeString (ohlcv, 'time'));
-        const modulo = this.integerModulo (timestamp, duration);
-        const alignedTimestamp = timestamp - modulo;
+        const alignedTimestamp = duration * parseInt (timestamp / duration);
         const options = this.safeValue (this.options, 'fetchOHLCV', {});
         const volumeField = this.safeString (options, 'volume', 'total_amount');
         return [
@@ -776,7 +764,7 @@ module.exports = class bitpanda extends Exchange {
         //         "sequence":603047
         //     }
         //
-        // fetchOrder, fetchOpenOrders, fetchClosedOrders trades (private)
+        // fetchMyTrades, fetchOrder, fetchOpenOrders, fetchClosedOrders trades (private)
         //
         //     {
         //         "fee": {
@@ -811,21 +799,7 @@ module.exports = class bitpanda extends Exchange {
             cost = amount * price;
         }
         const marketId = this.safeString (trade, 'instrument_code');
-        let symbol = undefined;
-        if (marketId !== undefined) {
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-                symbol = market['symbol'];
-            } else {
-                const [ baseId, quoteId ] = marketId.split ('_');
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
-        }
-        if ((market !== undefined) && (symbol === undefined)) {
-            symbol = market['symbol'];
-        }
+        const symbol = this.safeSymbol (marketId, market, '_');
         const feeCost = this.safeFloat (feeInfo, 'fee_amount');
         let takerOrMaker = undefined;
         let fee = undefined;
@@ -1086,6 +1060,55 @@ module.exports = class bitpanda extends Exchange {
         return this.parseTransactions (withdrawalHistory, currency, since, limit, { 'type': 'withdrawal' });
     }
 
+    async withdraw (code, amount, address, tag = undefined, params = {}) {
+        this.checkAddress (address);
+        await this.loadMarkets ();
+        const currency = this.currency (code);
+        const request = {
+            'currency': code,
+            'amount': this.currencyToPrecision (code, amount),
+            // 'payout_account_id': '66756a10-3e86-48f4-9678-b634c4b135b2', // fiat only
+            // 'recipient': { // crypto only
+            //     'address': address,
+            //     // 'destination_tag': '',
+            // },
+        };
+        const options = this.safeValue (this.options, 'fiat', []);
+        const isFiat = this.inArray (code, options);
+        const method = isFiat ? 'privatePostAccountWithdrawFiat' : 'privatePostAccountWithdrawCrypto';
+        if (isFiat) {
+            const payoutAccountId = this.safeString (params, 'payout_account_id');
+            if (payoutAccountId === undefined) {
+                throw ArgumentsRequired (this.id + ' withdraw() requires a payout_account_id param for fiat ' + code + ' withdrawals');
+            }
+        } else {
+            const recipient = { 'address': address };
+            if (tag !== undefined) {
+                recipient['destination_tag'] = tag;
+            }
+            request['recipient'] = recipient;
+        }
+        const response = await this[method] (this.extend (request, params));
+        //
+        // crypto
+        //
+        //     {
+        //         "amount": "1234.5678",
+        //         "fee": "1234.5678",
+        //         "recipient": "3NacQ7rzZdhfyAtfJ5a11k8jFPdcMP2Bq7",
+        //         "destination_tag": "",
+        //         "transaction_id": "d0f8529f-f832-4e6a-9dc5-b8d5797badb2"
+        //     }
+        //
+        // fiat
+        //
+        //     {
+        //         "transaction_id": "54236cd0-4413-11e9-93fb-5fea7e5b5df6"
+        //     }
+        //
+        return this.parseTransaction (response, currency);
+    }
+
     parseTransaction (transaction, currency = undefined) {
         //
         // fetchDeposits, fetchWithdrawals
@@ -1104,16 +1127,37 @@ module.exports = class bitpanda extends Exchange {
         //         "related_transaction_id": "e298341a-3855-405e-bce3-92db368a3157"
         //     }
         //
+        // withdraw
+        //
+        //
+        //     crypto
+        //
+        //     {
+        //         "amount": "1234.5678",
+        //         "fee": "1234.5678",
+        //         "recipient": "3NacQ7rzZdhfyAtfJ5a11k8jFPdcMP2Bq7",
+        //         "destination_tag": "",
+        //         "transaction_id": "d0f8529f-f832-4e6a-9dc5-b8d5797badb2"
+        //     }
+        //
+        //     fiat
+        //
+        //     {
+        //         "transaction_id": "54236cd0-4413-11e9-93fb-5fea7e5b5df6"
+        //     }
+        //
         const id = this.safeString (transaction, 'transaction_id');
         const amount = this.safeFloat (transaction, 'amount');
         const timestamp = this.parse8601 (this.safeString (transaction, 'time'));
         const currencyId = this.safeString (transaction, 'currency');
-        const code = this.safeCurrencyCode (currencyId, currency);
-        const status = undefined;
-        const feeCost = this.safeFloat (transaction, 'fee_amount');
+        currency = this.safeCurrency (currencyId, currency);
+        const status = 'ok'; // the exchange returns cleared transactions only
+        const feeCost = this.safeFloat2 (transaction, 'fee_amount', 'fee');
         let fee = undefined;
+        const addressTo = this.safeString (transaction, 'recipient');
+        const tagTo = this.safeString (transaction, 'destination_tag');
         if (feeCost !== undefined) {
-            const feeCurrencyId = this.safeString (transaction, 'fee_currency');
+            const feeCurrencyId = this.safeString (transaction, 'fee_currency', currencyId);
             const feeCurrencyCode = this.safeCurrencyCode (feeCurrencyId);
             fee = {
                 'cost': feeCost,
@@ -1123,14 +1167,14 @@ module.exports = class bitpanda extends Exchange {
         return {
             'info': transaction,
             'id': id,
-            'currency': code,
+            'currency': currency['code'],
             'amount': amount,
-            'address': undefined,
+            'address': addressTo,
             'addressFrom': undefined,
-            'addressTo': undefined,
-            'tag': undefined,
+            'addressTo': addressTo,
+            'tag': tagTo,
             'tagFrom': undefined,
-            'tagTo': undefined,
+            'tagTo': tagTo,
             'status': status,
             'type': undefined,
             'updated': undefined,
@@ -1229,21 +1273,8 @@ module.exports = class bitpanda extends Exchange {
         const clientOrderId = this.safeString (order, 'client_id');
         const timestamp = this.parse8601 (this.safeString (order, 'time'));
         let status = this.parseOrderStatus (this.safeString (order, 'status'));
-        let symbol = undefined;
         const marketId = this.safeString (order, 'instrument_code');
-        if (marketId !== undefined) {
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-            } else {
-                const [ baseId, quoteId ] = marketId.split ('_');
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
-        }
-        if ((symbol === undefined) && (market !== undefined)) {
-            symbol = market['symbol'];
-        }
+        const symbol = this.safeSymbol (marketId, market, '_');
         const price = this.safeFloat (order, 'price');
         const amount = this.safeFloat (order, 'amount');
         let cost = undefined;
@@ -1347,7 +1378,7 @@ module.exports = class bitpanda extends Exchange {
         const uppercaseType = type.toUpperCase ();
         const request = {
             'instrument_code': market['id'],
-            'type': type.toUpperCase (), // LIMIT, MARKET, STOP
+            'type': uppercaseType, // LIMIT, MARKET, STOP
             'side': side.toUpperCase (), // or SELL
             'amount': this.amountToPrecision (symbol, amount),
             // "price": "1234.5678", // required for LIMIT and STOP orders
@@ -1755,9 +1786,9 @@ module.exports = class bitpanda extends Exchange {
         //     {"error":"MISSING_TO_PARAM"}
         //     {"error":"CANDLESTICKS_TIME_RANGE_TOO_BIG"}
         //
-        const feedback = this.id + ' ' + body;
         const message = this.safeString (response, 'error');
         if (message !== undefined) {
+            const feedback = this.id + ' ' + body;
             this.throwExactlyMatchedException (this.exceptions['exact'], message, feedback);
             this.throwBroadlyMatchedException (this.exceptions['broad'], message, feedback);
             throw new ExchangeError (feedback); // unknown message

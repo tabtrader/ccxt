@@ -87,6 +87,7 @@ class digifinex(Exchange):
                         'time',
                         'trades',
                         'trades/symbols',
+                        'ticker',
                     ],
                 },
                 'private': {
@@ -169,6 +170,8 @@ class digifinex(Exchange):
             },
             'commonCurrencies': {
                 'BHT': 'Black House Test',
+                'MBN': 'Mobilian Coin',
+                'TEL': 'TEL666',
             },
         })
 
@@ -413,18 +416,11 @@ class digifinex(Exchange):
                 'date': date,
             }, tickers[reversedMarketId])
             quoteId, baseId = reversedMarketId.split('_')
-            marketId = baseId + '_' + quoteId
-            market = None
-            symbol = None
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
+            marketId = baseId.upper() + '_' + quoteId.upper()
+            market = self.safe_market(marketId, None, '_')
+            symbol = market['symbol']
             result[symbol] = self.parse_ticker(ticker, market)
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     def fetch_ticker(self, symbol, params={}):
         apiKey = self.safe_value(params, 'apiKey', self.apiKey)
@@ -433,7 +429,7 @@ class digifinex(Exchange):
         self.load_markets()
         market = self.market(symbol)
         # reversed base/quote in v2
-        marketId = market['quoteId'] + '_' + market['baseId']
+        marketId = market['quoteId'].lower() + '_' + market['baseId'].lower()
         request = {
             'symbol': marketId,
             'apiKey': apiKey,
@@ -545,20 +541,8 @@ class digifinex(Exchange):
         if price is not None:
             if amount is not None:
                 cost = price * amount
-        symbol = None
         marketId = self.safe_string(trade, 'symbol')
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('_')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if symbol is None:
-            if market is not None:
-                symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '_')
         takerOrMaker = self.safe_value(trade, 'is_maker')
         feeCost = self.safe_float(trade, 'fee')
         fee = None
@@ -836,21 +820,8 @@ class digifinex(Exchange):
             else:
                 type = 'limit'
         status = self.parse_order_status(self.safe_string(order, 'status'))
-        if market is None:
-            exchange = order['symbol'].upper()
-            if exchange in self.markets_by_id:
-                market = self.markets_by_id[exchange]
-        symbol = None
         marketId = self.safe_string(order, 'symbol')
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
-            else:
-                baseId, quoteId = marketId.split('_')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
+        symbol = self.safe_symbol(marketId, market, '_')
         amount = self.safe_float(order, 'amount')
         filled = self.safe_float(order, 'executed_amount')
         price = self.safe_float(order, 'price')
@@ -995,8 +966,11 @@ class digifinex(Exchange):
         #         ]
         #     }
         #
-        data = self.safe_value(response, 'data', {})
-        return self.parse_order(data, market)
+        data = self.safe_value(response, 'data', [])
+        order = self.safe_value(data, 0)
+        if order is None:
+            raise OrderNotFound(self.id + ' fetchOrder() order ' + id + ' not found')
+        return self.parse_order(order, market)
 
     def fetch_my_trades(self, symbol=None, since=None, limit=None, params={}):
         defaultType = self.safe_string(self.options, 'defaultType', 'spot')

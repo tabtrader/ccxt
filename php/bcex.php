@@ -103,6 +103,7 @@ class bcex extends Exchange {
                 '订单信息不存在' => '\\ccxt\\OrderNotFound', // array('code' => 1, 'msg' => '订单信息不存在') - 'Order information does not exist'
             ),
             'commonCurrencies' => array(
+                'UNI' => 'UNI COIN',
                 'PNT' => 'Penta',
             ),
             'options' => array(
@@ -412,9 +413,9 @@ class bcex extends Exchange {
                 $result[$code] = $this->account();
             }
             if ($lockOrOver === 'lock') {
-                $result[$code]['used'] = floatval ($amount);
+                $result[$code]['used'] = floatval($amount);
             } else {
-                $result[$code]['free'] = floatval ($amount);
+                $result[$code]['free'] = floatval($amount);
             }
         }
         $keys = is_array($result) ? array_keys($result) : array();

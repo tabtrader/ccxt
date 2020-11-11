@@ -344,10 +344,10 @@ class braziliex(Exchange):
         ids = list(response.keys())
         for i in range(0, len(ids)):
             marketId = ids[i]
-            market = self.markets_by_id[marketId]
+            market = self.safe_market(marketId)
             symbol = market['symbol']
             result[symbol] = self.parse_ticker(response[marketId], market)
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     async def fetch_order_book(self, symbol, limit=None, params={}):
         await self.load_markets()
@@ -422,13 +422,8 @@ class braziliex(Exchange):
         #         "date":"2017-03-12 15:13:33"
         #     }
         #
-        symbol = None
-        if market is None:
-            marketId = self.safe_string(order, 'market')
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-        if market is not None:
-            symbol = market['symbol']
+        marketId = self.safe_string(order, 'market')
+        symbol = self.safe_symbol(marketId, market, '_')
         timestamp = self.safe_integer(order, 'timestamp')
         if timestamp is None:
             timestamp = self.parse8601(self.safe_string(order, 'date'))

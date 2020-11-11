@@ -128,7 +128,7 @@ class kucoin extends Exchange {
                         'margin/lend/trade/settled',
                         'margin/lend/assets',
                         'margin/market',
-                        'margin/margin/trade/last',
+                        'margin/trade/last',
                     ),
                     'post' => array(
                         'accounts',
@@ -182,8 +182,9 @@ class kucoin extends Exchange {
                     '404' => '\\ccxt\\NotSupported',
                     '405' => '\\ccxt\\NotSupported',
                     '429' => '\\ccxt\\RateLimitExceeded',
-                    '500' => '\\ccxt\\ExchangeError',
+                    '500' => '\\ccxt\\ExchangeNotAvailable', // Internal Server Error -- We had a problem with our server. Try again later.
                     '503' => '\\ccxt\\ExchangeNotAvailable',
+                    '101030' => '\\ccxt\\PermissionDenied', // array("code":"101030","msg":"You haven't yet enabled the margin trading")
                     '200004' => '\\ccxt\\InsufficientFunds',
                     '230003' => '\\ccxt\\InsufficientFunds', // array("code":"230003","msg":"Balance insufficient!")
                     '260100' => '\\ccxt\\InsufficientFunds', // array("code":"260100","msg":"account.noBalance")
@@ -264,7 +265,7 @@ class kucoin extends Exchange {
         $response = $this->publicGetTimestamp ($params);
         $after = $this->milliseconds();
         $kucoinTime = $this->safe_integer($response, 'data');
-        $this->options['timeDifference'] = intval ($after - $kucoinTime);
+        $this->options['timeDifference'] = intval($after - $kucoinTime);
         return $this->options['timeDifference'];
     }
 
@@ -374,10 +375,17 @@ class kucoin extends Exchange {
         $response = $this->publicGetCurrencies ($params);
         //
         //     {
-        //         $precision => 10,
-        //         $name => 'KCS',
-        //         fullName => 'KCS shares',
-        //         currency => 'KCS'
+        //       "currency" => "OMG",
+        //       "$name" => "OMG",
+        //       "fullName" => "OmiseGO",
+        //       "$precision" => 8,
+        //       "confirms" => 12,
+        //       "withdrawalMinSize" => "4",
+        //       "withdrawalMinFee" => "1.25",
+        //       "$isWithdrawEnabled" => false,
+        //       "$isDepositEnabled" => false,
+        //       "isMarginEnabled" => false,
+        //       "isDebitEnabled" => false
         //     }
         //
         $responseData = $response['data'];
@@ -388,14 +396,18 @@ class kucoin extends Exchange {
             $name = $this->safe_string($entry, 'fullName');
             $code = $this->safe_currency_code($id);
             $precision = $this->safe_integer($entry, 'precision');
+            $isWithdrawEnabled = $this->safe_value($entry, 'isWithdrawEnabled', false);
+            $isDepositEnabled = $this->safe_value($entry, 'isDepositEnabled', false);
+            $fee = $this->safe_float($entry, 'withdrawalMinFee');
+            $active = ($isWithdrawEnabled && $isDepositEnabled);
             $result[$code] = array(
                 'id' => $id,
                 'name' => $name,
                 'code' => $code,
                 'precision' => $precision,
                 'info' => $entry,
-                'active' => null,
-                'fee' => null,
+                'active' => $active,
+                'fee' => $fee,
                 'limits' => $this->limits,
             );
         }
@@ -505,24 +517,8 @@ class kucoin extends Exchange {
             $percentage = $percentage * 100;
         }
         $last = $this->safe_float_2($ticker, 'last', 'lastTradedPrice');
-        $symbol = null;
         $marketId = $this->safe_string($ticker, 'symbol');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-                $symbol = $market['symbol'];
-            } else {
-                list($baseId, $quoteId) = explode('-', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if ($symbol === null) {
-            if ($market !== null) {
-                $symbol = $market['symbol'];
-            }
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $baseVolume = $this->safe_float($ticker, 'vol');
         $quoteVolume = $this->safe_float($ticker, 'volValue');
         $vwap = $this->vwap($baseVolume, $quoteVolume);
@@ -584,7 +580,7 @@ class kucoin extends Exchange {
                 $result[$symbol] = $ticker;
             }
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -647,7 +643,7 @@ class kucoin extends Exchange {
         $duration = $this->parse_timeframe($timeframe) * 1000;
         $endAt = $this->milliseconds(); // required param
         if ($since !== null) {
-            $request['startAt'] = intval ((int) floor($since / 1000));
+            $request['startAt'] = intval((int) floor($since / 1000));
             if ($limit === null) {
                 // https://docs.kucoin.com/#get-klines
                 // https://docs.kucoin.com/#details
@@ -658,9 +654,9 @@ class kucoin extends Exchange {
             $endAt = $this->sum($since, $limit * $duration);
         } else if ($limit !== null) {
             $since = $endAt - $limit * $duration;
-            $request['startAt'] = intval ((int) floor($since / 1000));
+            $request['startAt'] = intval((int) floor($since / 1000));
         }
-        $request['endAt'] = intval ((int) floor($endAt / 1000));
+        $request['endAt'] = intval((int) floor($endAt / 1000));
         $response = $this->publicGetMarketCandles (array_merge($request, $params));
         //
         //     {
@@ -988,25 +984,8 @@ class kucoin extends Exchange {
         //         "createdAt" => 1547026471000  // time
         //     }
         //
-        $symbol = null;
         $marketId = $this->safe_string($order, 'symbol');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-                $symbol = $market['symbol'];
-            } else {
-                list($baseId, $quoteId) = explode('-', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-            $market = $this->safe_value($this->markets_by_id, $marketId);
-        }
-        if ($symbol === null) {
-            if ($market !== null) {
-                $symbol = $market['symbol'];
-            }
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $orderId = $this->safe_string($order, 'id');
         $type = $this->safe_string($order, 'type');
         $timestamp = $this->safe_integer($order, 'createdAt');
@@ -1090,7 +1069,7 @@ class kucoin extends Exchange {
             // it returns historical $trades instead of orders
             // returns $trades earlier than 2019-02-18T00:00:00Z only
             if ($since !== null) {
-                $request['startAt'] = intval ($since / 1000);
+                $request['startAt'] = intval($since / 1000);
             }
         } else {
             throw new ExchangeError($this->id . ' invalid fetchClosedOrder method');
@@ -1254,31 +1233,15 @@ class kucoin extends Exchange {
         //         "$id":"5c4d389e4c8c60413f78e2e5",
         //     }
         //
-        $symbol = null;
         $marketId = $this->safe_string($trade, 'symbol');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-                $symbol = $market['symbol'];
-            } else {
-                list($baseId, $quoteId) = explode('-', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if ($symbol === null) {
-            if ($market !== null) {
-                $symbol = $market['symbol'];
-            }
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $id = $this->safe_string_2($trade, 'tradeId', 'id');
         $orderId = $this->safe_string($trade, 'orderId');
         $takerOrMaker = $this->safe_string($trade, 'liquidity');
         $amount = $this->safe_float_2($trade, 'size', 'amount');
         $timestamp = $this->safe_integer($trade, 'time');
         if ($timestamp !== null) {
-            $timestamp = intval ($timestamp / 1000000);
+            $timestamp = intval($timestamp / 1000000);
         } else {
             $timestamp = $this->safe_integer($trade, 'createdAt');
             // if it's a historical v1 $trade, the exchange returns $timestamp in seconds
@@ -1485,7 +1448,7 @@ class kucoin extends Exchange {
         if ($since !== null) {
             // if $since is earlier than 2019-02-18T00:00:00Z
             if ($since < 1550448000000) {
-                $request['startAt'] = intval ($since / 1000);
+                $request['startAt'] = intval($since / 1000);
                 $method = 'privateGetHistDeposits';
             } else {
                 $request['startAt'] = $since;
@@ -1548,7 +1511,7 @@ class kucoin extends Exchange {
         if ($since !== null) {
             // if $since is earlier than 2019-02-18T00:00:00Z
             if ($since < 1550448000000) {
-                $request['startAt'] = intval ($since / 1000);
+                $request['startAt'] = intval($since / 1000);
                 $method = 'privateGetHistWithdrawals';
             } else {
                 $request['startAt'] = $since;
@@ -1815,14 +1778,14 @@ class kucoin extends Exchange {
             ), $headers);
             $payload = $timestamp . $method . $endpoint . $endpart;
             $signature = $this->hmac($this->encode($payload), $this->encode($this->secret), 'sha256', 'base64');
-            $headers['KC-API-SIGN'] = $this->decode($signature);
+            $headers['KC-API-SIGN'] = $signature;
             $partner = $this->safe_value($this->options, 'partner', array());
             $partnerId = $this->safe_string($partner, 'id');
             $partnerSecret = $this->safe_string($partner, 'secret');
             if (($partnerId !== null) && ($partnerSecret !== null)) {
                 $partnerPayload = $timestamp . $partnerId . $this->apiKey;
                 $partnerSignature = $this->hmac($this->encode($partnerPayload), $this->encode($partnerSecret), 'sha256', 'base64');
-                $headers['KC-API-PARTNER-SIGN'] = $this->decode($partnerSignature);
+                $headers['KC-API-PARTNER-SIGN'] = $partnerSignature;
                 $headers['KC-API-PARTNER'] = $partnerId;
             }
         }

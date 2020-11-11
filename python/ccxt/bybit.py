@@ -100,6 +100,7 @@ class bybit(Exchange):
                         'position/list',
                         'wallet/balance',
                         'execution/list',
+                        'trade/closed-pnl/list',
                     ],
                     'post': [
                         'order/create',
@@ -153,11 +154,11 @@ class bybit(Exchange):
                     'post': [
                         'order/create',
                         'order/cancel',
-                        'order/cancelAll',
+                        'order/cancel-all',
                         'order/replace',
                         'stop-order/create',
                         'stop-order/cancel',
-                        'stop-order/cancelAll',
+                        'stop-order/cancel-all',
                         'stop-order/replace',
                         'position/switch-isolated',
                         'position/set-auto-add-margin',
@@ -273,17 +274,19 @@ class bybit(Exchange):
                 },
                 'broad': {
                     'unknown orderInfo': OrderNotFound,  # {"ret_code":-1,"ret_msg":"unknown orderInfo","ext_code":"","ext_info":"","result":null,"time_now":"1584030414.005545","rate_limit_status":99,"rate_limit_reset_ms":1584030414003,"rate_limit":100}
+                    'invalid api_key': AuthenticationError,  # {"ret_code":10003,"ret_msg":"invalid api_key","ext_code":"","ext_info":"","result":null,"time_now":"1599547085.415797"}
                 },
             },
             'precisionMode': TICK_SIZE,
             'options': {
                 'marketTypes': {
                     'BTC/USDT': 'linear',
+                    'ETH/USDT': 'linear',
+                    'LTC/USDT': 'linear',
+                    'XTZ/USDT': 'linear',
+                    'LINK/USDT': 'linear',
                 },
                 'code': 'BTC',
-                'fetchBalance': {
-                    'code': 'BTC',
-                },
                 'cancelAllOrders': {
                     'method': 'privatePostOrderCancelAll',  # privatePostStopOrderCancelAll
                 },
@@ -414,13 +417,14 @@ class bybit(Exchange):
 
     def fetch_balance(self, params={}):
         self.load_markets()
-        defaultCode = self.safe_value(self.options, 'code', 'BTC')
-        options = self.safe_value(self.options, 'fetchBalance', {})
-        code = self.safe_value(options, 'code', defaultCode)
-        currency = self.currency(code)
-        request = {
-            'coin': currency['id'],
-        }
+        request = {}
+        coin = self.safe_string(params, 'coin')
+        code = self.safe_string(params, 'code')
+        if coin is not None:
+            request['coin'] = coin
+        elif code is not None:
+            currency = self.currency(code)
+            request['coin'] = currency['id']
         response = self.privateGetWalletBalance(self.extend(request, params))
         #
         #     {
@@ -792,20 +796,12 @@ class bybit(Exchange):
         #     }
         #
         id = self.safe_string_2(trade, 'id', 'exec_id')
-        symbol = None
-        base = None
         marketId = self.safe_string(trade, 'symbol')
+        market = self.safe_market(marketId, market)
+        symbol = market['symbol']
         amount = self.safe_float_2(trade, 'qty', 'exec_qty')
         cost = self.safe_float(trade, 'exec_value')
-        price = self.safe_float_2(trade, 'price', 'exec_price')
-        if marketId in self.markets_by_id:
-            market = self.markets_by_id[marketId]
-            symbol = market['symbol']
-            base = market['base']
-        if market is not None:
-            if symbol is None:
-                symbol = market['symbol']
-                base = market['base']
+        price = self.safe_float_2(trade, 'exec_price', 'price')
         if cost is None:
             if amount is not None:
                 if price is not None:
@@ -819,9 +815,10 @@ class bybit(Exchange):
         feeCost = self.safe_float(trade, 'exec_fee')
         fee = None
         if feeCost is not None:
+            feeCurrencyCode = market['base'] if market['inverse'] else market['quote']
             fee = {
                 'cost': feeCost,
-                'currency': base,
+                'currency': feeCurrencyCode,
                 'rate': self.safe_float(trade, 'fee_rate'),
             }
         return {
@@ -1041,6 +1038,7 @@ class bybit(Exchange):
             market = self.markets_by_id[marketId]
         timestamp = self.parse8601(self.safe_string(order, 'created_at'))
         id = self.safe_string_2(order, 'order_id', 'stop_order_id')
+        type = self.safe_string_lower(order, 'order_type')
         price = self.safe_float(order, 'price')
         average = self.safe_float(order, 'average_price')
         amount = self.safe_float(order, 'qty')
@@ -1061,7 +1059,11 @@ class bybit(Exchange):
             if cost is None:
                 if price is not None:
                     cost = price * filled
-        status = self.parse_order_status(self.safe_string(order, 'order_status'))
+            if (type == 'market') and (cost is not None) and (cost > 0):
+                price = None
+                if average is None:
+                    average = filled / cost
+        status = self.parse_order_status(self.safe_string_2(order, 'order_status', 'stop_order_status'))
         side = self.safe_string_lower(order, 'side')
         feeCost = self.safe_float(order, 'cum_exec_fee')
         fee = None
@@ -1071,7 +1073,6 @@ class bybit(Exchange):
                 'cost': feeCost,
                 'currency': base,
             }
-        type = self.safe_string_lower(order, 'order_type')
         clientOrderId = self.safe_string(order, 'order_link_id')
         if (clientOrderId is not None) and (len(clientOrderId) < 1):
             clientOrderId = None
@@ -1206,10 +1207,10 @@ class bybit(Exchange):
             'time_in_force': 'GoodTillCancel',  # ImmediateOrCancel, FillOrKill, PostOnly
             # 'take_profit': 123.45,  # take profit price, only take effect upon opening the position
             # 'stop_loss': 123.45,  # stop loss price, only take effect upon opening the position
-            # 'reduce_only': False,  # reduce only
+            # 'reduce_only': False,  # reduce only, required for linear orders
             # when creating a closing order, bybit recommends a True value for
             # close_on_trigger to avoid failing due to insufficient available margin
-            # 'close_on_trigger': False,
+            # 'close_on_trigger': False, required for linear orders
             # 'order_link_id': 'string',  # unique client order id, max 36 characters
             # conditional orders ---------------------------------------------
             # base_price is used to compare with the value of stop_px, to decide
@@ -1233,6 +1234,10 @@ class bybit(Exchange):
         marketTypes = self.safe_value(self.options, 'marketTypes', {})
         marketType = self.safe_string(marketTypes, symbol)
         method = 'privateLinearPostOrderCreate' if (marketType == 'linear') else 'privatePostOrderCreate'
+        if marketType == 'linear':
+            method = 'privateLinearPostOrderCreate'
+            request['reduce_only'] = False
+            request['close_on_trigger'] = False
         if stopPx is not None:
             if basePrice is None:
                 raise ArgumentsRequired(self.id + ' createOrder requires both the stop_px and base_price params for a conditional ' + type + ' order')
@@ -2016,6 +2021,11 @@ class bybit(Exchange):
                 'timestamp': timestamp,
             })
             auth = self.rawencode(self.keysort(query))
+            # https://github.com/ccxt/ccxt/issues/7377
+            # https://github.com/ccxt/ccxt/issues/7515
+            # bybit encodes whole floats as integers without .0 for conditional stop-orders only
+            if path.find('stop-order') >= 0:
+                auth = auth.replace('.0&', '&')
             signature = self.hmac(self.encode(auth), self.encode(self.secret))
             if method == 'POST':
                 body = self.json(self.extend(query, {

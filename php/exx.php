@@ -7,6 +7,7 @@ namespace ccxt;
 
 use Exception; // a common import
 use \ccxt\ExchangeError;
+use \ccxt\ArgumentsRequired;
 use \ccxt\ExchangeNotAvailable;
 
 class exx extends Exchange {
@@ -93,6 +94,7 @@ class exx extends Exchange {
                 ),
             ),
             'commonCurrencies' => array(
+                'DOS' => 'DEMOS',
                 'TV' => 'TIV', // Ti-Value
             ),
             'exceptions' => array(
@@ -114,8 +116,8 @@ class exx extends Exchange {
             $symbol = $base . '/' . $quote;
             $active = $market['isOpen'] === true;
             $precision = array(
-                'amount' => intval ($market['amountScale']),
-                'price' => intval ($market['priceScale']),
+                'amount' => intval($market['amountScale']),
+                'price' => intval($market['priceScale']),
             );
             $result[] = array(
                 'id' => $id,
@@ -204,7 +206,7 @@ class exx extends Exchange {
             );
             $result[$symbol] = $this->parse_ticker($ticker, $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_order_book($symbol, $limit = null, $params = array ()) {
@@ -297,12 +299,12 @@ class exx extends Exchange {
         //     }
         //
         $symbol = $market['symbol'];
-        $timestamp = intval ($order['trade_date']);
+        $timestamp = intval($order['trade_date']);
         $price = $this->safe_float($order, 'price');
         $cost = $this->safe_float($order, 'trade_money');
         $amount = $this->safe_float($order, 'total_amount');
         $filled = $this->safe_float($order, 'trade_amount', 0.0);
-        $remaining = floatval ($this->amount_to_precision($symbol, $amount - $filled));
+        $remaining = floatval($this->amount_to_precision($symbol, $amount - $filled));
         $status = $this->safe_integer($order, 'status');
         if ($status === 1) {
             $status = 'canceled';
@@ -386,12 +388,15 @@ class exx extends Exchange {
 
     public function fetch_open_orders($symbol = null, $since = null, $limit = null, $params = array ()) {
         $this->load_markets();
+        if ($symbol === null) {
+            throw new ArgumentsRequired($this->id . ' fetchOpenOrders requires a $symbol argument');
+        }
         $market = $this->market($symbol);
         $request = array(
             'currency' => $market['id'],
         );
         $response = $this->privateGetGetOpenOrders (array_merge($request, $params));
-        if (gettype($response) !== 'array' || count(array_filter(array_keys($response), 'is_string')) != 0) {
+        if (gettype($response) === 'array' && count(array_filter(array_keys($response), 'is_string')) != 0) {
             return array();
         }
         return $this->parse_orders($response, $market, $since, $limit);

@@ -237,7 +237,7 @@ class acx extends Exchange {
             }
             $result[$symbol] = $this->parse_ticker($response[$id], $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -315,7 +315,7 @@ class acx extends Exchange {
             'limit' => $limit,
         );
         if ($since !== null) {
-            $request['timestamp'] = intval ($since / 1000);
+            $request['timestamp'] = intval($since / 1000);
         }
         $response = $this->publicGetK (array_merge($request, $params));
         return $this->parse_ohlcvs($response, $market, $timeframe, $since, $limit);
@@ -331,13 +331,8 @@ class acx extends Exchange {
     }
 
     public function parse_order($order, $market = null) {
-        $symbol = null;
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        } else {
-            $marketId = $this->safe_string($order, 'market');
-            $symbol = $this->markets_by_id[$marketId]['symbol'];
-        }
+        $marketId = $this->safe_string($order, 'market');
+        $symbol = $this->safe_symbol($marketId, $market);
         $timestamp = $this->parse8601($this->safe_string($order, 'created_at'));
         $status = $this->parse_order_status($this->safe_string($order, 'state'));
         $type = $this->safe_string($order, 'type');
@@ -368,7 +363,7 @@ class acx extends Exchange {
     public function fetch_order($id, $symbol = null, $params = array ()) {
         $this->load_markets();
         $request = array(
-            'id' => intval ($id),
+            'id' => intval($id),
         );
         $response = $this->privateGetOrder (array_merge($request, $params));
         return $this->parse_order($response);

@@ -71,9 +71,10 @@ module.exports = class southxchange extends Exchange {
                 },
             },
             'commonCurrencies': {
-                'SMT': 'SmartNode',
-                'MTC': 'Marinecoin',
                 'BHD': 'Bithold',
+                'GHOST': 'GHOSTPRISM',
+                'MTC': 'Marinecoin',
+                'SMT': 'SmartNode',
             },
         });
     }
@@ -171,16 +172,12 @@ module.exports = class southxchange extends Exchange {
         const result = {};
         for (let i = 0; i < ids.length; i++) {
             const id = ids[i];
-            let symbol = id;
-            let market = undefined;
-            if (id in this.markets_by_id) {
-                market = this.markets_by_id[id];
-                symbol = market['symbol'];
-            }
+            const market = this.safeMarket (id);
+            const symbol = market['symbol'];
             const ticker = tickers[id];
             result[symbol] = this.parseTicker (ticker, market);
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchTicker (symbol, params = {}) {
@@ -303,9 +300,10 @@ module.exports = class southxchange extends Exchange {
             request['limitPrice'] = price;
         }
         const response = await this.privatePostPlaceOrder (this.extend (request, params));
+        const id = JSON.parse (response);
         return {
             'info': response,
-            'id': response.toString (),
+            'id': id,
         };
     }
 

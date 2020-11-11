@@ -963,17 +963,7 @@ class bitmax(Exchange):
         #
         status = self.parse_order_status(self.safe_string(order, 'status'))
         marketId = self.safe_string(order, 'symbol')
-        symbol = None
-        if marketId is not None:
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-            else:
-                baseId, quoteId = marketId.split('/')
-                base = self.safe_currency_code(baseId)
-                quote = self.safe_currency_code(quoteId)
-                symbol = base + '/' + quote
-        if (symbol is None) and (market is not None):
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market, '/')
         timestamp = self.safe_integer_2(order, 'timestamp', 'sendingTime')
         lastTradeTimestamp = self.safe_integer(order, 'lastExecTime')
         price = self.safe_float(order, 'price')
@@ -1617,12 +1607,12 @@ class bitmax(Exchange):
         else:
             self.check_required_credentials()
             timestamp = str(self.milliseconds())
-            auth = timestamp + '+' + request
-            signature = self.hmac(self.encode(auth), self.encode(self.secret), hashlib.sha256, 'base64')
+            payload = timestamp + '+' + request
+            hmac = self.hmac(self.encode(payload), self.encode(self.secret), hashlib.sha256, 'base64')
             headers = {
                 'x-auth-key': self.apiKey,
                 'x-auth-timestamp': timestamp,
-                'x-auth-signature': self.decode(signature),
+                'x-auth-signature': hmac,
             }
             if method == 'GET':
                 if query:

@@ -193,7 +193,7 @@ class btcturk extends Exchange {
             }
             $result[$symbol] = $this->parse_ticker($ticker, $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -320,7 +320,7 @@ class btcturk extends Exchange {
             $headers = array(
                 'X-PCK' => $this->apiKey,
                 'X-Stamp' => $nonce,
-                'X-Signature' => base64_encode($this->hmac($this->encode($auth), $secret, 'sha256', 'binary')),
+                'X-Signature' => $this->hmac($this->encode($auth), $secret, 'sha256', 'base64'),
                 'Content-Type' => 'application/x-www-form-urlencoded',
             );
         }

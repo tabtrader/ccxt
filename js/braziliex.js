@@ -344,11 +344,11 @@ module.exports = class braziliex extends Exchange {
         const ids = Object.keys (response);
         for (let i = 0; i < ids.length; i++) {
             const marketId = ids[i];
-            const market = this.markets_by_id[marketId];
+            const market = this.safeMarket (marketId);
             const symbol = market['symbol'];
             result[symbol] = this.parseTicker (response[marketId], market);
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchOrderBook (symbol, limit = undefined, params = {}) {
@@ -430,16 +430,8 @@ module.exports = class braziliex extends Exchange {
         //         "date":"2017-03-12 15:13:33"
         //     }
         //
-        let symbol = undefined;
-        if (market === undefined) {
-            const marketId = this.safeString (order, 'market');
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-            }
-        }
-        if (market !== undefined) {
-            symbol = market['symbol'];
-        }
+        const marketId = this.safeString (order, 'market');
+        const symbol = this.safeSymbol (marketId, market, '_');
         let timestamp = this.safeInteger (order, 'timestamp');
         if (timestamp === undefined) {
             timestamp = this.parse8601 (this.safeString (order, 'date'));

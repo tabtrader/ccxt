@@ -274,11 +274,11 @@ class therock(Exchange):
         result = {}
         for i in range(0, len(ids)):
             id = ids[i]
-            market = self.markets_by_id[id]
+            market = self.safe_market(id)
             symbol = market['symbol']
             ticker = tickers[id]
             result[symbol] = self.parse_ticker(ticker, market)
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     async def fetch_ticker(self, symbol, params={}):
         await self.load_markets()
@@ -327,8 +327,8 @@ class therock(Exchange):
         #                         currency: "EUR",
         #                         trade_id:  440492                     }   ]}
         #
-        if not market:
-            market = self.markets_by_id[trade['fund_id']]
+        marketId = self.safe_string(trade, 'fund_id')
+        symbol = self.safe_symbol(marketId, market)
         timestamp = self.parse8601(self.safe_string(trade, 'date'))
         id = self.safe_string(trade, 'id')
         orderId = self.safe_string(trade, 'order_id')
@@ -353,9 +353,6 @@ class therock(Exchange):
                 'cost': feeCost,
                 'currency': market['quote'],
             }
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
         return {
             'info': trade,
             'id': id,
@@ -886,11 +883,8 @@ class therock(Exchange):
         #     }
         #
         id = self.safe_string(order, 'id')
-        symbol = None
         marketId = self.safe_string(order, 'fund_id')
-        if marketId in self.markets_by_id:
-            market = self.markets_by_id[marketId]
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market)
         status = self.parse_order_status(self.safe_string(order, 'status'))
         timestamp = self.parse8601(self.safe_string(order, 'date'))
         type = self.safe_string(order, 'type')

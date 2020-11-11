@@ -74,6 +74,7 @@ module.exports = class digifinex extends Exchange {
                         'time',
                         'trades',
                         'trades/symbols',
+                        'ticker',
                     ],
                 },
                 'private': {
@@ -156,6 +157,8 @@ module.exports = class digifinex extends Exchange {
             },
             'commonCurrencies': {
                 'BHT': 'Black House Test',
+                'MBN': 'Mobilian Coin',
+                'TEL': 'TEL666',
             },
         });
     }
@@ -411,20 +414,12 @@ module.exports = class digifinex extends Exchange {
                 'date': date,
             }, tickers[reversedMarketId]);
             const [ quoteId, baseId ] = reversedMarketId.split ('_');
-            const marketId = baseId + '_' + quoteId;
-            let market = undefined;
-            let symbol = undefined;
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-                symbol = market['symbol'];
-            } else {
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
+            const marketId = baseId.toUpperCase () + '_' + quoteId.toUpperCase ();
+            const market = this.safeMarket (marketId, undefined, '_');
+            const symbol = market['symbol'];
             result[symbol] = this.parseTicker (ticker, market);
         }
-        return result;
+        return this.filterByArray (result, 'symbol', symbols);
     }
 
     async fetchTicker (symbol, params = {}) {
@@ -435,7 +430,7 @@ module.exports = class digifinex extends Exchange {
         await this.loadMarkets ();
         const market = this.market (symbol);
         // reversed base/quote in v2
-        const marketId = market['quoteId'] + '_' + market['baseId'];
+        const marketId = market['quoteId'].toLowerCase () + '_' + market['baseId'].toLowerCase ();
         const request = {
             'symbol': marketId,
             'apiKey': apiKey,
@@ -552,24 +547,8 @@ module.exports = class digifinex extends Exchange {
                 cost = price * amount;
             }
         }
-        let symbol = undefined;
         const marketId = this.safeString (trade, 'symbol');
-        if (marketId !== undefined) {
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-                symbol = market['symbol'];
-            } else {
-                const [ baseId, quoteId ] = marketId.split ('_');
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
-        }
-        if (symbol === undefined) {
-            if (market !== undefined) {
-                symbol = market['symbol'];
-            }
-        }
+        const symbol = this.safeSymbol (marketId, market, '_');
         const takerOrMaker = this.safeValue (trade, 'is_maker');
         const feeCost = this.safeFloat (trade, 'fee');
         let fee = undefined;
@@ -866,25 +845,8 @@ module.exports = class digifinex extends Exchange {
             }
         }
         const status = this.parseOrderStatus (this.safeString (order, 'status'));
-        if (market === undefined) {
-            const exchange = order['symbol'].toUpperCase ();
-            if (exchange in this.markets_by_id) {
-                market = this.markets_by_id[exchange];
-            }
-        }
-        let symbol = undefined;
         const marketId = this.safeString (order, 'symbol');
-        if (marketId !== undefined) {
-            if (marketId in this.markets_by_id) {
-                market = this.markets_by_id[marketId];
-                symbol = market['symbol'];
-            } else {
-                const [ baseId, quoteId ] = marketId.split ('_');
-                const base = this.safeCurrencyCode (baseId);
-                const quote = this.safeCurrencyCode (quoteId);
-                symbol = base + '/' + quote;
-            }
-        }
+        const symbol = this.safeSymbol (marketId, market, '_');
         const amount = this.safeFloat (order, 'amount');
         const filled = this.safeFloat (order, 'executed_amount');
         const price = this.safeFloat (order, 'price');
@@ -1040,8 +1002,12 @@ module.exports = class digifinex extends Exchange {
         //         ]
         //     }
         //
-        const data = this.safeValue (response, 'data', {});
-        return this.parseOrder (data, market);
+        const data = this.safeValue (response, 'data', []);
+        const order = this.safeValue (data, 0);
+        if (order === undefined) {
+            throw new OrderNotFound (this.id + ' fetchOrder() order ' + id + ' not found');
+        }
+        return this.parseOrder (order, market);
     }
 
     async fetchMyTrades (symbol = undefined, since = undefined, limit = undefined, params = {}) {

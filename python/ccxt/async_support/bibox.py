@@ -139,6 +139,8 @@ class bibox(Exchange):
                 '4003': DDoSProtection,  # server busy please try again later
             },
             'commonCurrencies': {
+                'BOX': 'DefiBox',
+                'BPT': 'BlockPool Token',
                 'KEY': 'Bihu',
                 'MTC': 'MTC Mesh Network',  # conflict with MTC Docademic doc.com Token https://github.com/ccxt/ccxt/issues/6081 https://github.com/ccxt/ccxt/issues/3025
                 'PAI': 'PCHAIN',
@@ -288,7 +290,8 @@ class bibox(Exchange):
         }
         response = await self.publicGetMdata(self.extend(request, params))
         tickers = self.parse_tickers(response['result'], symbols)
-        return self.index_by(tickers, 'symbol')
+        result = self.index_by(tickers, 'symbol')
+        return self.filter_by_array(result, 'symbol', symbols)
 
     def parse_trade(self, trade, market=None):
         timestamp = self.safe_integer_2(trade, 'time', 'createdAt')
@@ -322,7 +325,7 @@ class bibox(Exchange):
             cost = price * amount
         if feeCost is not None:
             fee = {
-                'cost': feeCost,
+                'cost': -feeCost,
                 'currency': feeCurrency,
                 'rate': feeRate,
             }

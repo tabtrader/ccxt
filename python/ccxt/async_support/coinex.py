@@ -265,18 +265,15 @@ class coinex(Exchange):
         result = {}
         for i in range(0, len(marketIds)):
             marketId = marketIds[i]
-            symbol = marketId
-            market = None
-            if marketId in self.markets_by_id:
-                market = self.markets_by_id[marketId]
-                symbol = market['symbol']
+            market = self.safe_market(marketId)
+            symbol = market['symbol']
             ticker = self.parse_ticker({
                 'date': timestamp,
                 'ticker': tickers[marketId],
             }, market)
             ticker['symbol'] = symbol
             result[symbol] = ticker
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     async def fetch_order_book(self, symbol, limit=20, params={}):
         await self.load_markets()
@@ -300,10 +297,7 @@ class coinex(Exchange):
         price = self.safe_float(trade, 'price')
         amount = self.safe_float(trade, 'amount')
         marketId = self.safe_string(trade, 'market')
-        market = self.safe_value(self.markets_by_id, marketId, market)
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market)
         cost = self.safe_float(trade, 'deal_money')
         if not cost:
             cost = float(self.cost_to_precision(symbol, price * amount))
@@ -372,6 +366,8 @@ class coinex(Exchange):
             'market': market['id'],
             'type': self.timeframes[timeframe],
         }
+        if limit is not None:
+            request['limit'] = limit
         response = await self.publicGetMarketKline(self.extend(request, params))
         #
         #     {
@@ -465,7 +461,7 @@ class coinex(Exchange):
         average = self.safe_float(order, 'avg_price')
         symbol = None
         marketId = self.safe_string(order, 'market')
-        market = self.safe_value(self.markets_by_id, marketId)
+        market = self.safe_market(marketId, market)
         feeCurrencyId = self.safe_string(order, 'fee_asset')
         feeCurrency = self.safe_currency_code(feeCurrencyId)
         if market is not None:

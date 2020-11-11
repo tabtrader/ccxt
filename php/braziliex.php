@@ -349,11 +349,11 @@ class braziliex extends Exchange {
         $ids = is_array($response) ? array_keys($response) : array();
         for ($i = 0; $i < count($ids); $i++) {
             $marketId = $ids[$i];
-            $market = $this->markets_by_id[$marketId];
+            $market = $this->safe_market($marketId);
             $symbol = $market['symbol'];
             $result[$symbol] = $this->parse_ticker($response[$marketId], $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_order_book($symbol, $limit = null, $params = array ()) {
@@ -435,16 +435,8 @@ class braziliex extends Exchange {
         //         "date":"2017-03-12 15:13:33"
         //     }
         //
-        $symbol = null;
-        if ($market === null) {
-            $marketId = $this->safe_string($order, 'market');
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-            }
-        }
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        }
+        $marketId = $this->safe_string($order, 'market');
+        $symbol = $this->safe_symbol($marketId, $market, '_');
         $timestamp = $this->safe_integer($order, 'timestamp');
         if ($timestamp === null) {
             $timestamp = $this->parse8601($this->safe_string($order, 'date'));
@@ -454,7 +446,7 @@ class braziliex extends Exchange {
         $amount = $this->safe_float($order, 'amount');
         $filledPercentage = $this->safe_float($order, 'progress');
         $filled = $amount * $filledPercentage;
-        $remaining = floatval ($this->amount_to_precision($symbol, $amount - $filled));
+        $remaining = floatval($this->amount_to_precision($symbol, $amount - $filled));
         $info = $order;
         if (is_array($info) && array_key_exists('info', $info)) {
             $info = $order['info'];

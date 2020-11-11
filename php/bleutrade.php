@@ -126,7 +126,6 @@ class bleutrade extends Exchange {
             ),
             'options' => array(
                 'parseOrderStatus' => true,
-                'symbolSeparator' => '_',
             ),
         ));
         // undocumented api calls
@@ -258,7 +257,7 @@ class bleutrade extends Exchange {
             'market' => $market['id'],
         );
         $response = $this->v3PublicGetGetmarketsummary (array_merge($request, $params));
-        $ticker = $response['result'][0];
+        $ticker = $this->safe_value($response, 'result', array());
         return $this->parse_ticker($ticker, $market);
     }
 
@@ -295,18 +294,8 @@ class bleutrade extends Exchange {
         //     MarketCurrency => 'Litecoin',
         //     BaseCurrency => 'Tether' }
         $timestamp = $this->parse8601($this->safe_string($ticker, 'TimeStamp'));
-        $symbol = null;
         $marketId = $this->safe_string($ticker, 'MarketName');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-            } else {
-                $symbol = $this->parse_symbol($marketId);
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '_');
         $previous = $this->safe_float($ticker, 'PrevDay');
         $last = $this->safe_float($ticker, 'Last');
         $change = null;
@@ -414,13 +403,6 @@ class bleutrade extends Exchange {
         $response = $this->v3PrivatePostGetopenorders (array_merge($request, $params));
         $items = $this->safe_value($response, 'result', array());
         return $this->parse_orders($items, $market, $since, $limit);
-    }
-
-    public function parse_symbol($id) {
-        list($base, $quote) = explode($this->options['symbolSeparator'], $id);
-        $base = $this->safe_currency_code($base);
-        $quote = $this->safe_currency_code($quote);
-        return $base . '/' . $quote;
     }
 
     public function fetch_balance($params = array ()) {
@@ -558,7 +540,7 @@ class bleutrade extends Exchange {
             $part = $parts[$i];
             if (mb_strpos($part, 'fee') === 0) {
                 $part = str_replace('fee ', '', $part);
-                $feeCost = floatval ($part);
+                $feeCost = floatval($part);
                 if ($feeCost < 0) {
                     $feeCost = -$feeCost;
                 }
@@ -648,20 +630,8 @@ class bleutrade extends Exchange {
         //     Comments => array( String => '', Valid => true )
         $side = strtolower($this->safe_string($order, 'Type'));
         $status = $this->parse_order_status($this->safe_string($order, 'Status'));
-        $symbol = null;
         $marketId = $this->safe_string($order, 'Exchange');
-        if ($marketId === null) {
-            if ($market !== null) {
-                $symbol = $market['symbol'];
-            }
-        } else {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-                $symbol = $market['symbol'];
-            } else {
-                $symbol = $this->parse_symbol($marketId);
-            }
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '_');
         $timestamp = null;
         if (is_array($order) && array_key_exists('Created', $order)) {
             $timestamp = $this->parse8601($order['Created'] . '+00:00');
@@ -757,9 +727,9 @@ class bleutrade extends Exchange {
         $feeCost = null;
         $labelParts = explode(';', $label);
         if (strlen($labelParts) === 3) {
-            $amount = floatval ($labelParts[0]);
+            $amount = floatval($labelParts[0]);
             $address = $labelParts[1];
-            $feeCost = floatval ($labelParts[2]);
+            $feeCost = floatval($labelParts[2]);
         } else {
             $address = $label;
         }

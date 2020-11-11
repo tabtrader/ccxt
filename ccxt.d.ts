@@ -436,11 +436,11 @@ declare module 'ccxt' {
     export class bibox extends Exchange {}
     export class bigone extends Exchange {}
     export class binance extends Exchange {}
-    export class binanceje extends binance {}
     export class binanceus extends binance {}
     export class bit2c extends Exchange {}
     export class bitbank extends Exchange {}
     export class bitbay extends Exchange {}
+    export class bitcoincom extends hitbtc {}
     export class bitfinex extends Exchange {}
     export class bitfinex2 extends bitfinex {}
     export class bitflyer extends Exchange {}
@@ -524,6 +524,7 @@ declare module 'ccxt' {
     export class lykke extends Exchange {}
     export class mercado extends Exchange {}
     export class mixcoins extends Exchange {}
+    export class novadax extends Exchange {}
     export class oceanex extends Exchange {}
     export class okcoin extends okex {}
     export class okex extends Exchange {}
@@ -533,6 +534,7 @@ declare module 'ccxt' {
     export class probit extends Exchange {}
     export class qtrade extends Exchange {}
     export class rightbtc extends Exchange {}
+    export class ripio extends Exchange {}
     export class southxchange extends Exchange {}
     export class stex extends Exchange {}
     export class stronghold extends Exchange {}

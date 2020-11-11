@@ -64,11 +64,11 @@ class bytetrade extends Exchange {
                 ),
                 'logo' => 'https://user-images.githubusercontent.com/1294454/67288762-2f04a600-f4e6-11e9-9fd6-c60641919491.jpg',
                 'api' => array(
-                    'market' => 'https://api-v2.bytetrade.com',
-                    'public' => 'https://api-v2.bytetrade.com',
+                    'market' => 'https://api-v2.byte-trade.com',
+                    'public' => 'https://api-v2.byte-trade.com',
                 ),
                 'www' => 'https://www.byte-trade.com',
-                'doc' => 'https://github.com/Bytetrade/bytetrade-official-api-docs/wiki',
+                'doc' => 'https://docs.byte-trade.com/#description',
             ),
             'api' => array(
                 'market' => array(
@@ -111,6 +111,7 @@ class bytetrade extends Exchange {
             'commonCurrencies' => array(
                 '44' => 'ByteHub',
                 '48' => 'Blocktonic',
+                '133' => 'TerraCredit',
             ),
             'exceptions' => array(
                 'vertify error' => '\\ccxt\\AuthenticationError', // typo on the exchange side, 'vertify'
@@ -236,8 +237,8 @@ class bytetrade extends Exchange {
             $quote = $this->safe_string($market, 'quoteName');
             $baseId = $this->safe_string($market, 'base');
             $quoteId = $this->safe_string($market, 'quote');
-            $normalBase = explode('@', $base)[0];
-            $normalQuote = explode('@', $quote)[0];
+            $normalBase = explode('@' . $baseId, $base)[0];
+            $normalQuote = explode('@' . $quoteId, $quote)[0];
             if ($quoteId === '126') {
                 $normalQuote = 'ZAR'; // The $id 126 coin is a special coin whose name on the chain is actually ZAR, but it is changed to ZCN after creation, so it must be changed to ZAR when placing the transaction in the chain
             }
@@ -635,6 +636,8 @@ class bytetrade extends Exchange {
         $defaultDappId = 'Sagittarius';
         $dappId = $this->safe_string($params, 'dappId', $defaultDappId);
         $defaultFee = $this->safe_string($this->options, 'fee', '300000000000000');
+        $totalFeeRate = $this->safe_string($params, 'totalFeeRate', 8);
+        $chainFeeRate = $this->safe_string($params, 'chainFeeRate', 1);
         $fee = $this->safe_string($params, 'fee', $defaultFee);
         $eightBytes = $this->integer_pow('2', '64');
         $allByteStringArray = array(
@@ -659,9 +662,12 @@ class bytetrade extends Exchange {
             $this->number_to_le(0, 2),
             $this->number_to_le((int) floor($now / 1000), 4),
             $this->number_to_le((int) floor($expiration / 1000), 4),
-            $this->number_to_le(0, 2),
-            $this->number_to_le(intval ($quoteId), 4),
-            $this->number_to_le(intval ($baseId), 4),
+            $this->number_to_le(1, 1),
+            $this->number_to_le(intval($chainFeeRate), 2),
+            $this->number_to_le(1, 1),
+            $this->number_to_le(intval($totalFeeRate), 2),
+            $this->number_to_le(intval($quoteId), 4),
+            $this->number_to_le(intval($baseId), 4),
             $this->number_to_le(0, 1),
             $this->number_to_le(1, 1),
             $this->number_to_le(strlen($dappId), 1),
@@ -689,9 +695,12 @@ class bytetrade extends Exchange {
             $this->number_to_le(0, 2),
             $this->number_to_le((int) floor($now / 1000), 4),
             $this->number_to_le((int) floor($expiration / 1000), 4),
-            $this->number_to_le(0, 2),
-            $this->number_to_le(intval ($quoteId), 4),
-            $this->number_to_le(intval ($baseId), 4),
+            $this->number_to_le(1, 1),
+            $this->number_to_le(intval($chainFeeRate), 2),
+            $this->number_to_le(1, 1),
+            $this->number_to_le(intval($totalFeeRate), 2),
+            $this->number_to_le(intval($quoteId), 4),
+            $this->number_to_le(intval($baseId), 4),
             $this->number_to_le(0, 1),
             $this->number_to_le(1, 1),
             $this->number_to_le(strlen($dappId), 1),
@@ -712,7 +721,7 @@ class bytetrade extends Exchange {
         $bytestring = $this->binary_concat_array($allByteStringArray);
         $hash = $this->hash($bytestring, 'sha256', 'hex');
         $signature = $this->ecdsa($hash, $this->secret, 'secp256k1', null, true);
-        $recoveryParam = $this->decode(bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1)));
+        $recoveryParam = bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1));
         $mySignature = $recoveryParam . $signature['r'] . $signature['s'];
         $operation = array(
             'now' => $datetime,
@@ -725,8 +734,10 @@ class bytetrade extends Exchange {
             'amount' => $amountChain,
             'price' => $priceChain,
             'use_btt_as_fee' => false,
-            'money_id' => intval ($quoteId),
-            'stock_id' => intval ($baseId),
+            'money_id' => intval($quoteId),
+            'stock_id' => intval($baseId),
+            'custom_no_btt_fee_rate' => intval($totalFeeRate),
+            'custom_btt_fee_rate' => intval($chainFeeRate),
         );
         $fatty = array(
             'timestamp' => $datetime,
@@ -885,8 +896,8 @@ class bytetrade extends Exchange {
             $this->number_to_le(strlen($normalSymbol), 1),
             $this->encode($normalSymbol),
             $this->base16_to_binary($id),
-            $this->number_to_le(intval ($quoteId), 4),
-            $this->number_to_le(intval ($baseId), 4),
+            $this->number_to_le(intval($quoteId), 4),
+            $this->number_to_le(intval($baseId), 4),
             $this->number_to_le(0, 1),
             $this->number_to_le(1, 1),
             $this->number_to_le(strlen($dappId), 1),
@@ -896,15 +907,15 @@ class bytetrade extends Exchange {
         $bytestring = $this->binary_concat_array($byteStringArray);
         $hash = $this->hash($bytestring, 'sha256', 'hex');
         $signature = $this->ecdsa($hash, $this->secret, 'secp256k1', null, true);
-        $recoveryParam = $this->decode(bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1)));
+        $recoveryParam = bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1));
         $mySignature = $recoveryParam . $signature['r'] . $signature['s'];
         $operation = array(
             'fee' => $feeAmount,
             'creator' => $this->apiKey,
             'order_id' => $id,
             'market_name' => $normalSymbol,
-            'money_id' => intval ($quoteId),
-            'stock_id' => intval ($baseId),
+            'money_id' => intval($quoteId),
+            'stock_id' => intval($baseId),
         );
         $fatty = array(
             'timestamp' => $datetime,
@@ -959,7 +970,7 @@ class bytetrade extends Exchange {
         $currency = $this->currency($code);
         $amountTruncate = $this->decimal_to_precision($amount, TRUNCATE, $currency['info']['basePrecision'] - $currency['info']['transferPrecision'], DECIMAL_PLACES, NO_PADDING);
         $amountChain = $this->to_wei($amountTruncate, $currency['precision']['amount']);
-        $assetType = intval ($currency['id']);
+        $assetType = intval($currency['id']);
         $now = $this->milliseconds();
         $expiration = $now;
         $datetime = $this->iso8601($now);
@@ -998,13 +1009,13 @@ class bytetrade extends Exchange {
         $bytestring = $this->binary_concat_array($byteStringArray);
         $hash = $this->hash($bytestring, 'sha256', 'hex');
         $signature = $this->ecdsa($hash, $this->secret, 'secp256k1', null, true);
-        $recoveryParam = $this->decode(bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1)));
+        $recoveryParam = bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1));
         $mySignature = $recoveryParam . $signature['r'] . $signature['s'];
         $operation = array(
             'fee' => '300000000000000',
             'from' => $this->apiKey,
             'to' => $address,
-            'asset_type' => intval ($currency['id']),
+            'asset_type' => intval($currency['id']),
             'amount' => (string) $amountChain,
             'message' => $message,
         );
@@ -1258,7 +1269,7 @@ class bytetrade extends Exchange {
                 $this->encode($this->apiKey),
                 $this->number_to_le(strlen($address), 1),
                 $this->encode($address),
-                $this->number_to_le(intval ($coinId), 4),
+                $this->number_to_le(intval($coinId), 4),
                 $this->number_to_le($this->integer_divide($amountChain, $eightBytes), 8),
                 $this->number_to_le($this->integer_modulo($amountChain, $eightBytes), 8),
                 $this->number_to_le(1, 1),
@@ -1291,7 +1302,7 @@ class bytetrade extends Exchange {
                 $this->encode($this->apiKey),
                 $this->number_to_le(strlen($middleAddress), 1),
                 $this->encode($middleAddress),
-                $this->number_to_le(intval ($coinId), 4),
+                $this->number_to_le(intval($coinId), 4),
                 $this->number_to_le($this->integer_divide($amountChain, $eightBytes), 8),
                 $this->number_to_le($this->integer_modulo($amountChain, $eightBytes), 8),
                 $this->number_to_le(0, 1),
@@ -1304,7 +1315,7 @@ class bytetrade extends Exchange {
         $bytestring = $this->binary_concat_array($byteStringArray);
         $hash = $this->hash($bytestring, 'sha256', 'hex');
         $signature = $this->ecdsa($hash, $this->secret, 'secp256k1', null, true);
-        $recoveryParam = $this->decode(bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1)));
+        $recoveryParam = bin2hex($this->number_to_le($this->sum($signature['v'], 31), 1));
         $mySignature = $recoveryParam . $signature['r'] . $signature['s'];
         $fatty = null;
         $request = null;
@@ -1315,7 +1326,7 @@ class bytetrade extends Exchange {
                 'fee' => $feeAmount,
                 'from' => $this->apiKey,
                 'to_external_address' => $address,
-                'asset_type' => intval ($coinId),
+                'asset_type' => intval($coinId),
                 'amount' => $amountChain,
                 'asset_fee' => $assetFee,
             );
@@ -1344,7 +1355,7 @@ class bytetrade extends Exchange {
                 'fee' => $feeAmount,
                 'from' => $this->apiKey,
                 'to_external_address' => $middleAddress,
-                'asset_type' => intval ($coinId),
+                'asset_type' => intval($coinId),
                 'amount' => $amountChain,
                 'asset_fee' => $assetFee,
             );

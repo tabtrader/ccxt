@@ -8,6 +8,7 @@ import hashlib
 import math
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
+from ccxt.base.errors import ArgumentsRequired
 from ccxt.base.errors import ExchangeNotAvailable
 
 
@@ -95,6 +96,7 @@ class exx(Exchange):
                 },
             },
             'commonCurrencies': {
+                'DOS': 'DEMOS',
                 'TV': 'TIV',  # Ti-Value
             },
             'exceptions': {
@@ -199,7 +201,7 @@ class exx(Exchange):
                 'ticker': response[id],
             }
             result[symbol] = self.parse_ticker(ticker, market)
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     async def fetch_order_book(self, symbol, limit=None, params={}):
         await self.load_markets()
@@ -366,6 +368,8 @@ class exx(Exchange):
 
     async def fetch_open_orders(self, symbol=None, since=None, limit=None, params={}):
         await self.load_markets()
+        if symbol is None:
+            raise ArgumentsRequired(self.id + ' fetchOpenOrders requires a symbol argument')
         market = self.market(symbol)
         request = {
             'currency': market['id'],

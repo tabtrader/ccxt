@@ -235,7 +235,7 @@ class coingi extends Exchange {
             }
             $result[$symbol] = $this->parse_ticker($ticker, $market);
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -259,13 +259,7 @@ class coingi extends Exchange {
         $timestamp = $this->safe_integer($trade, 'timestamp');
         $id = $this->safe_string($trade, 'id');
         $marketId = $this->safe_string($trade, 'currencyPair');
-        if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-            $market = $this->markets_by_id[$marketId];
-        }
-        $symbol = null;
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market);
         return array(
             'id' => $id,
             'info' => $trade,

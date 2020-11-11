@@ -233,6 +233,7 @@ class liquid extends Exchange {
             $amountPrecision = $this->safe_integer($currency, 'display_precision');
             $pricePrecision = $this->safe_integer($currency, 'quoting_precision');
             $precision = max ($amountPrecision, $pricePrecision);
+            $decimalPrecision = 1 / pow(10, $precision);
             $result[$code] = array(
                 'id' => $id,
                 'code' => $code,
@@ -240,7 +241,7 @@ class liquid extends Exchange {
                 'name' => $code,
                 'active' => $active,
                 'fee' => $this->safe_float($currency, 'withdrawal_fee'),
-                'precision' => $precision,
+                'precision' => $decimalPrecision,
                 'limits' => array(
                     'amount' => array(
                         'min' => pow(10, -$amountPrecision),
@@ -572,7 +573,7 @@ class liquid extends Exchange {
             $symbol = $ticker['symbol'];
             $result[$symbol] = $ticker;
         }
-        return $result;
+        return $this->filter_by_array($result, 'symbol', $symbols);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -644,7 +645,7 @@ class liquid extends Exchange {
         }
         if ($since !== null) {
             // timestamp should be in seconds, whereas we use milliseconds in $since and everywhere
-            $request['timestamp'] = intval ($since / 1000);
+            $request['timestamp'] = intval($since / 1000);
         }
         $response = $this->publicGetExecutions (array_merge($request, $params));
         $result = ($since !== null) ? $response : $response['models'];

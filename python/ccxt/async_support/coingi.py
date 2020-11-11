@@ -231,7 +231,7 @@ class coingi(Exchange):
             if symbol in self.markets:
                 market = self.markets[symbol]
             result[symbol] = self.parse_ticker(ticker, market)
-        return result
+        return self.filter_by_array(result, 'symbol', symbols)
 
     async def fetch_ticker(self, symbol, params={}):
         await self.load_markets()
@@ -250,11 +250,7 @@ class coingi(Exchange):
         timestamp = self.safe_integer(trade, 'timestamp')
         id = self.safe_string(trade, 'id')
         marketId = self.safe_string(trade, 'currencyPair')
-        if marketId in self.markets_by_id:
-            market = self.markets_by_id[marketId]
-        symbol = None
-        if market is not None:
-            symbol = market['symbol']
+        symbol = self.safe_symbol(marketId, market)
         return {
             'id': id,
             'info': trade,

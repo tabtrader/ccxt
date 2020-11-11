@@ -135,9 +135,14 @@ class crex24 extends Exchange {
                 ),
             ),
             'commonCurrencies' => array(
-                'YOYO' => 'YOYOW',
-                'BULL' => 'BuySell',
                 'BCC' => 'BCH',
+                'BULL' => 'BuySell',
+                'CREDIT' => 'TerraCredit',
+                'GHOST' => 'GHOSTPRISM',
+                'IQ' => 'IQ.Cash',
+                'PUT' => 'PutinCoin',
+                'UNI' => 'Universe',
+                'YOYO' => 'YOYOW',
             ),
             // exchange-specific options
             'options' => array(
@@ -392,17 +397,8 @@ class crex24 extends Exchange {
         //             $timestamp => "2018-10-31T09:21:25Z" }   ]
         //
         $timestamp = $this->parse8601($this->safe_string($ticker, 'timestamp'));
-        $symbol = null;
         $marketId = $this->safe_string($ticker, 'instrument');
-        $market = $this->safe_value($this->markets_by_id, $marketId, $market);
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        } else if ($marketId !== null) {
-            list($baseId, $quoteId) = explode('-', $marketId);
-            $base = $this->safe_currency_code($baseId);
-            $quote = $this->safe_currency_code($quoteId);
-            $symbol = $base . '/' . $quote;
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $last = $this->safe_float($ticker, 'last');
         return array(
             'symbol' => $symbol,
@@ -536,12 +532,8 @@ class crex24 extends Exchange {
         $id = $this->safe_string($trade, 'id');
         $side = $this->safe_string($trade, 'side');
         $orderId = $this->safe_string($trade, 'orderId');
-        $symbol = null;
         $marketId = $this->safe_string($trade, 'instrument');
-        $market = $this->safe_value($this->markets_by_id, $marketId, $market);
-        if ($market !== null) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $fee = null;
         $feeCurrencyId = $this->safe_string($trade, 'feeCurrency');
         $feeCode = $this->safe_currency_code($feeCurrencyId);
@@ -676,21 +668,8 @@ class crex24 extends Exchange {
         //     }
         //
         $status = $this->parse_order_status($this->safe_string($order, 'status'));
-        $symbol = null;
         $marketId = $this->safe_string($order, 'instrument');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-            } else {
-                list($baseId, $quoteId) = explode('-', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '-');
         $timestamp = $this->parse8601($this->safe_string($order, 'timestamp'));
         $price = $this->safe_float($order, 'price');
         $amount = $this->safe_float($order, 'volume');
@@ -702,7 +681,7 @@ class crex24 extends Exchange {
             if ($amount !== null) {
                 $filled = $amount - $remaining;
                 if ($this->options['parseOrderToPrecision']) {
-                    $filled = floatval ($this->amount_to_precision($symbol, $filled));
+                    $filled = floatval($this->amount_to_precision($symbol, $filled));
                 }
                 $filled = max ($filled, 0.0);
                 if ($price !== null) {
@@ -730,7 +709,7 @@ class crex24 extends Exchange {
                 $average = $cost / $filled;
             }
             if ($this->options['parseOrderToPrecision']) {
-                $cost = floatval ($this->cost_to_precision($symbol, $cost));
+                $cost = floatval($this->cost_to_precision($symbol, $cost));
             }
         }
         return array(
@@ -1032,7 +1011,7 @@ class crex24 extends Exchange {
         $this->load_markets();
         $request = array(
             'ids' => array(
-                intval ($id),
+                intval($id),
             ),
         );
         $response = $this->tradingPostCancelOrdersById (array_merge($request, $params));
@@ -1259,7 +1238,7 @@ class crex24 extends Exchange {
         $request = array(
             'currency' => $currency['id'],
             'address' => $address,
-            'amount' => floatval ($this->currency_to_precision($code, $amount)),
+            'amount' => floatval($this->currency_to_precision($code, $amount)),
             // sets whether the specified $amount includes fee, can have either of the two values
             // true - balance will be decreased by $amount, whereas [$amount - fee] will be transferred to the specified $address
             // false - $amount will be deposited to the specified $address, whereas the balance will be decreased by [$amount . fee]
@@ -1296,8 +1275,7 @@ class crex24 extends Exchange {
                 $body = $this->json($params);
                 $auth .= $body;
             }
-            $signature = base64_encode($this->hmac($this->encode($auth), $secret, 'sha512', 'binary'));
-            $headers['X-CREX24-API-SIGN'] = $this->decode($signature);
+            $headers['X-CREX24-API-SIGN'] = $this->hmac($this->encode($auth), $secret, 'sha512', 'base64');
         }
         return array( 'url' => $url, 'method' => $method, 'body' => $body, 'headers' => $headers );
     }

@@ -1,6 +1,6 @@
 {
   "name": "ccxt",
-  "version": "1.33.80",
+  "version": "1.37.59",
   "description": "A JavaScript / Python / PHP cryptocurrency trading library with support for 130+ exchanges",
   "main": "./ccxt.js",
   "unpkg": "dist/ccxt.browser.js",
@@ -46,7 +46,7 @@
   "devDependencies": {
     "ansicolor": "1.1.81",
     "as-table": "1.0.37",
-    "asciichart": "1.5.7",
+    "asciichart": "1.5.25",
     "browserify": "14.5.0",
     "chai": "4.1.2",
     "chai-as-promised": "7.1.1",
@@ -526,7 +526,15 @@
     "xena.exchange",
     "Xena Exchange",
     "bitget.com",
-    "Bitget"
+    "Bitget",
+    "idex.io",
+    "novadax.com.br",
+    "NovaDAX",
+    "exchange.ripio.com",
+    "Ripio",
+    "huobi.com",
+    "exchange.bitcoin.com",
+    "bitcoin.com"
   ],
   "collective": {
     "type": "opencollective",

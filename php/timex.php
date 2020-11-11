@@ -938,13 +938,13 @@ class timex extends Exchange {
             if ($dotIndex > 0) {
                 $whole = mb_substr($feeString, 0, $dotIndex - 0);
                 $fraction = mb_substr($feeString, -$dotIndex);
-                $fee = floatval ($whole . '.' . $fraction);
+                $fee = floatval($whole . '.' . $fraction);
             } else {
                 $fraction = '.';
                 for ($i = 0; $i < -$dotIndex; $i++) {
                     $fraction .= '0';
                 }
-                $fee = floatval ($fraction . $feeString);
+                $fee = floatval($fraction . $feeString);
             }
         }
         return array(
@@ -989,22 +989,8 @@ class timex extends Exchange {
         //         "volumeQuote" => 0.07312
         //     }
         //
-        $symbol = null;
         $marketId = $this->safe_string($ticker, 'market');
-        if ($marketId !== null) {
-            if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-                $market = $this->markets_by_id[$marketId];
-                $symbol = $market['symbol'];
-            } else {
-                list($baseId, $quoteId) = explode('/', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market, '/');
         $timestamp = $this->parse8601($this->safe_string($ticker, 'timestamp'));
         $last = $this->safe_float($ticker, 'last');
         $open = $this->safe_float($ticker, 'open');
@@ -1069,15 +1055,8 @@ class timex extends Exchange {
         //         "$timestamp" => "2019-12-08T04:54:11.171Z"
         //     }
         //
-        $symbol = null;
         $marketId = $this->safe_string($trade, 'symbol');
-        if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-            $market = $this->markets_by_id[$marketId];
-            $symbol = $market['symbol'];
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market);
         $timestamp = $this->parse8601($this->safe_string($trade, 'timestamp'));
         $price = $this->safe_float($trade, 'price');
         $amount = $this->safe_float($trade, 'quantity');
@@ -1164,15 +1143,8 @@ class timex extends Exchange {
         $id = $this->safe_string($order, 'id');
         $type = $this->safe_string_lower($order, 'type');
         $side = $this->safe_string_lower($order, 'side');
-        $symbol = null;
         $marketId = $this->safe_string($order, 'symbol');
-        if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-            $market = $this->markets_by_id[$marketId];
-            $symbol = $market['symbol'];
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $symbol = $this->safe_symbol($marketId, $market);
         $timestamp = $this->parse8601($this->safe_string($order, 'createdAt'));
         $price = $this->safe_float($order, 'price');
         $amount = $this->safe_float($order, 'quantity');
@@ -1190,7 +1162,7 @@ class timex extends Exchange {
                 $status = 'open';
             }
         }
-        $cost = floatval ($this->cost_to_precision($symbol, $price * $filled));
+        $cost = floatval($this->cost_to_precision($symbol, $price * $filled));
         $fee = null;
         $lastTradeTimestamp = null;
         $trades = null;
@@ -1236,7 +1208,7 @@ class timex extends Exchange {
         }
         if ($api !== 'public') {
             $this->check_required_credentials();
-            $auth = base64_encode($this->encode($this->apiKey . ':' . $this->secret));
+            $auth = base64_encode($this->apiKey . ':' . $this->secret);
             $secret = 'Basic ' . $this->decode($auth);
             $headers = array( 'authorization' => $secret );
         }

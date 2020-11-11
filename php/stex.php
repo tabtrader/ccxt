@@ -185,6 +185,7 @@ class stex extends Exchange {
                 ),
             ),
             'commonCurrencies' => array(
+                'BC' => 'Bitcoin Confidential',
                 'BHD' => 'Bithold',
             ),
             'options' => array(
@@ -515,22 +516,8 @@ class stex extends Exchange {
         //     }
         //
         $timestamp = $this->safe_integer($ticker, 'timestamp');
-        $symbol = null;
-        $marketId = $this->safe_string($ticker, 'id');
-        if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-            $market = $this->markets_by_id[$marketId];
-        } else {
-            $marketId = $this->safe_string($ticker, 'symbol');
-            if ($marketId !== null) {
-                list($baseId, $quoteId) = explode('_', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $marketId = $this->safe_string_2($ticker, 'id', 'symbol');
+        $symbol = $this->safe_symbol($marketId, $market, '_');
         $last = $this->safe_float($ticker, 'last');
         $open = $this->safe_float($ticker, 'open');
         $change = null;
@@ -668,7 +655,7 @@ class stex extends Exchange {
             $request['timeEnd'] = $this->seconds();
             $request['timeStart'] = $request['timeEnd'] - $timerange;
         } else {
-            $request['timeStart'] = intval ($since / 1000);
+            $request['timeStart'] = intval($since / 1000);
             $request['timeEnd'] = $this->sum($request['timeStart'], $timerange);
         }
         $response = $this->publicGetChartCurrencyPairIdCandlesType (array_merge($request, $params));
@@ -761,7 +748,7 @@ class stex extends Exchange {
         }
         if ($since !== null) {
             $request['sort'] = 'ASC'; // needed to make the from param work
-            $request['from'] = intval ($since / 1000);
+            $request['from'] = intval($since / 1000);
         }
         $response = $this->publicGetTradesCurrencyPairId (array_merge($request, $params));
         //
@@ -895,22 +882,8 @@ class stex extends Exchange {
         //
         $id = $this->safe_string($order, 'id');
         $status = $this->parse_order_status($this->safe_string($order, 'status'));
-        $symbol = null;
-        $marketId = $this->safe_string($order, 'currency_pair_id');
-        if (is_array($this->markets_by_id) && array_key_exists($marketId, $this->markets_by_id)) {
-            $market = $this->markets_by_id[$marketId];
-        } else {
-            $marketId = $this->safe_string($order, 'currency_pair_name');
-            if ($marketId !== null) {
-                list($baseId, $quoteId) = explode('_', $marketId);
-                $base = $this->safe_currency_code($baseId);
-                $quote = $this->safe_currency_code($quoteId);
-                $symbol = $base . '/' . $quote;
-            }
-        }
-        if (($symbol === null) && ($market !== null)) {
-            $symbol = $market['symbol'];
-        }
+        $marketId = $this->safe_string_2($order, 'currency_pair_id', 'currency_pair_name');
+        $symbol = $this->safe_symbol($marketId, $market, '_');
         $timestamp = $this->safe_timestamp($order, 'timestamp');
         $price = $this->safe_float($order, 'price');
         $amount = $this->safe_float($order, 'initial_amount');
@@ -921,7 +894,7 @@ class stex extends Exchange {
             if ($amount !== null) {
                 $remaining = $amount - $filled;
                 if ($this->options['parseOrderToPrecision']) {
-                    $remaining = floatval ($this->amount_to_precision($symbol, $remaining));
+                    $remaining = floatval($this->amount_to_precision($symbol, $remaining));
                 }
                 $remaining = max ($remaining, 0.0);
             }
@@ -1000,8 +973,8 @@ class stex extends Exchange {
         $request = array(
             'currencyPairId' => $market['id'],
             'type' => strtoupper($type), // 'BUY', 'SELL', 'STOP_LIMIT_BUY', 'STOP_LIMIT_SELL'
-            'amount' => floatval ($this->amount_to_precision($symbol, $amount)), // required
-            'price' => floatval ($this->price_to_precision($symbol, $price)), // required
+            'amount' => floatval($this->amount_to_precision($symbol, $amount)), // required
+            'price' => floatval($this->price_to_precision($symbol, $price)), // required
             // 'trigger_price' => 123.45 // required for STOP_LIMIT_BUY or STOP_LIMIT_SELL
         );
         $response = $this->tradingPostOrdersCurrencyPairId (array_merge($request, $params));
@@ -1704,7 +1677,7 @@ class stex extends Exchange {
         $currency = $this->currency($code);
         $request = array(
             'currency_id' => $currency['id'],
-            'amount' => floatval ($this->currency_to_precision($code, $amount)),
+            'amount' => floatval($this->currency_to_precision($code, $amount)),
             'address' => $address,
             // 'protocol_id' => 10, // optional, to be used with multicurrency wallets like USDT
             // 'additional_address_parameter' => $tag, // optional
